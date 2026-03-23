@@ -52,4 +52,14 @@ final class CategoryRepository {
       });
     });
   }
+
+  Future<void> adjustCheckedInPairs({
+    required String categoryId,
+    required int delta,
+  }) async {
+    await _categories.doc(categoryId).update(<String, Object>{
+      'checkedInPairs': FieldValue.increment(delta),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
 }

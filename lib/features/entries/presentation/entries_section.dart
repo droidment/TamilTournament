@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../theme/app_theme.dart';
+import '../../categories/data/category_providers.dart';
+import '../../categories/domain/category_item.dart';
 import '../data/entry_providers.dart';
 import '../domain/entry.dart';
 
@@ -18,75 +20,108 @@ final class EntriesSection extends ConsumerStatefulWidget {
 class _EntriesSectionState extends ConsumerState<EntriesSection> {
   bool _isCreating = false;
 
-  Future<void> _showCreateEntryDialog() async {
+  Future<void> _showCreateEntryDialog(List<CategoryItem> categories) async {
     final formKey = GlobalKey<FormState>();
     final playerOneController = TextEditingController();
     final playerTwoController = TextEditingController();
-    final categoryController = TextEditingController();
+    var selectedCategory = categories.first;
 
     final shouldCreate = await showDialog<bool>(
       context: context,
       builder: (context) {
-        return AlertDialog(
-          backgroundColor: AppPalette.surface,
-          surfaceTintColor: Colors.transparent,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(AppRadii.panel),
-            side: const BorderSide(color: AppPalette.line),
-          ),
-          title: const Text('Create entry draft'),
-          content: SizedBox(
-            width: 420,
-            child: Form(
-              key: formKey,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextFormField(
-                    controller: playerOneController,
-                    decoration: const InputDecoration(
-                      labelText: 'Player one',
-                      hintText: 'Arun',
-                    ),
-                    validator: _requiredField('Enter player one.'),
-                  ),
-                  const SizedBox(height: AppSpace.md),
-                  TextFormField(
-                    controller: playerTwoController,
-                    decoration: const InputDecoration(
-                      labelText: 'Player two',
-                      hintText: 'Vimal',
-                    ),
-                    validator: _requiredField('Enter player two.'),
-                  ),
-                  const SizedBox(height: AppSpace.md),
-                  TextFormField(
-                    controller: categoryController,
-                    decoration: const InputDecoration(
-                      labelText: 'Category',
-                      hintText: "Men's Open",
-                    ),
-                    validator: _requiredField('Enter a category name.'),
-                  ),
-                ],
+        return StatefulBuilder(
+          builder: (context, setDialogState) {
+            return AlertDialog(
+              backgroundColor: AppPalette.surface,
+              surfaceTintColor: Colors.transparent,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(AppRadii.panel),
+                side: const BorderSide(color: AppPalette.line),
               ),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(false),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                if (formKey.currentState?.validate() != true) {
-                  return;
-                }
-                Navigator.of(context).pop(true);
-              },
-              child: const Text('Create draft'),
-            ),
-          ],
+              title: const Text('Create entry draft'),
+              content: SizedBox(
+                width: 420,
+                child: Form(
+                  key: formKey,
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      TextFormField(
+                        controller: playerOneController,
+                        decoration: const InputDecoration(
+                          labelText: 'Player one',
+                          hintText: 'Arun',
+                        ),
+                        validator: _requiredField('Enter player one.'),
+                      ),
+                      const SizedBox(height: AppSpace.md),
+                      TextFormField(
+                        controller: playerTwoController,
+                        decoration: const InputDecoration(
+                          labelText: 'Player two',
+                          hintText: 'Vimal',
+                        ),
+                        validator: _requiredField('Enter player two.'),
+                      ),
+                      const SizedBox(height: AppSpace.md),
+                      DropdownButtonFormField<CategoryItem>(
+                        initialValue: selectedCategory,
+                        decoration: const InputDecoration(
+                          labelText: 'Category',
+                        ),
+                        items: categories
+                            .map(
+                              (category) => DropdownMenuItem(
+                                value: category,
+                                child: Text(category.name),
+                              ),
+                            )
+                            .toList(growable: false),
+                        onChanged: (value) {
+                          if (value == null) {
+                            return;
+                          }
+                          setDialogState(() {
+                            selectedCategory = value;
+                          });
+                        },
+                        validator: (value) {
+                          if (value == null) {
+                            return 'Select a category.';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: AppSpace.xs),
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: Text(
+                          'Entries will be stored against the selected category id.',
+                          style: Theme.of(context).textTheme.bodySmall
+                              ?.copyWith(color: AppPalette.inkMuted),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(false),
+                  child: const Text('Cancel'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    if (formKey.currentState?.validate() != true) {
+                      return;
+                    }
+                    Navigator.of(context).pop(true);
+                  },
+                  child: const Text('Create draft'),
+                ),
+              ],
+            );
+          },
         );
       },
     );
@@ -94,7 +129,6 @@ class _EntriesSectionState extends ConsumerState<EntriesSection> {
     if (shouldCreate != true || !mounted) {
       playerOneController.dispose();
       playerTwoController.dispose();
-      categoryController.dispose();
       return;
     }
 
@@ -111,9 +145,10 @@ class _EntriesSectionState extends ConsumerState<EntriesSection> {
           .read(entryRepositoryProvider)
           .createEntryDraft(
             tournamentId: widget.tournamentId,
+            categoryId: selectedCategory.id,
             playerOne: playerOneController.text,
             playerTwo: playerTwoController.text,
-            categoryName: categoryController.text,
+            categoryName: selectedCategory.name,
           );
       if (!mounted) {
         return;
@@ -131,7 +166,6 @@ class _EntriesSectionState extends ConsumerState<EntriesSection> {
     } finally {
       playerOneController.dispose();
       playerTwoController.dispose();
-      categoryController.dispose();
       if (mounted) {
         setState(() {
           _isCreating = false;
@@ -147,6 +181,7 @@ class _EntriesSectionState extends ConsumerState<EntriesSection> {
           .setCheckedIn(
             tournamentId: widget.tournamentId,
             entryId: entry.id,
+            categoryId: entry.categoryId,
             checkedIn: !entry.checkedIn,
           );
     } catch (error) {
@@ -162,7 +197,15 @@ class _EntriesSectionState extends ConsumerState<EntriesSection> {
   @override
   Widget build(BuildContext context) {
     final entries = ref.watch(entriesProvider(widget.tournamentId));
+    final categories = ref.watch(
+      tournamentCategoriesProvider(widget.tournamentId),
+    );
     final theme = Theme.of(context);
+    final categoryItems = categories.maybeWhen(
+      data: (items) => items,
+      orElse: () => const <CategoryItem>[],
+    );
+    final canCreateEntry = !_isCreating && categoryItems.isNotEmpty;
 
     return Container(
       padding: const EdgeInsets.all(AppSpace.lg),
@@ -195,7 +238,9 @@ class _EntriesSectionState extends ConsumerState<EntriesSection> {
                 ),
               ),
               FilledButton(
-                onPressed: _isCreating ? null : _showCreateEntryDialog,
+                onPressed: canCreateEntry
+                    ? () => _showCreateEntryDialog(categoryItems)
+                    : null,
                 child: Text(_isCreating ? 'Creating...' : 'New entry'),
               ),
             ],
@@ -482,15 +527,6 @@ final class _EntriesErrorState extends StatelessWidget {
   }
 }
 
-String? Function(String?) _requiredField(String message) {
-  return (value) {
-    if (value == null || value.trim().isEmpty) {
-      return message;
-    }
-    return null;
-  };
-}
-
 String _friendlyError(Object error) {
   final message = error.toString();
   if (message.contains('permission-denied')) {
@@ -500,4 +536,13 @@ String _friendlyError(Object error) {
     return 'Create the Firestore database in Firebase Console first, then reload the app.';
   }
   return message;
+}
+
+String? Function(String?) _requiredField(String message) {
+  return (value) {
+    if (value == null || value.trim().isEmpty) {
+      return message;
+    }
+    return null;
+  };
 }

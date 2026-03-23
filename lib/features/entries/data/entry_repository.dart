@@ -27,6 +27,7 @@ final class EntryRepository {
 
   Future<void> createEntryDraft({
     required String tournamentId,
+    required String categoryId,
     required String playerOne,
     required String playerTwo,
     required String categoryName,
@@ -41,6 +42,7 @@ final class EntryRepository {
         TournamentEntry(
           id: doc.id,
           tournamentId: tournamentId,
+          categoryId: categoryId,
           playerOne: playerOne,
           playerTwo: playerTwo,
           categoryName: categoryName,
@@ -49,6 +51,7 @@ final class EntryRepository {
           updatedAt: null,
         ).toCreateMap(
           tournamentId: tournamentId,
+          categoryId: categoryId,
           playerOne: playerOne,
           playerTwo: playerTwo,
           categoryName: categoryName,
@@ -64,11 +67,30 @@ final class EntryRepository {
   Future<void> setCheckedIn({
     required String tournamentId,
     required String entryId,
+    required String categoryId,
     required bool checkedIn,
   }) async {
-    await _entries(tournamentId).doc(entryId).update(<String, Object>{
-      'checkedIn': checkedIn,
-      'updatedAt': FieldValue.serverTimestamp(),
+    final entryRef = _entries(tournamentId).doc(entryId);
+    final categoryRef = _firestore.collection('categories').doc(categoryId);
+    await _firestore.runTransaction((transaction) async {
+      final snapshot = await transaction.get(entryRef);
+      if (!snapshot.exists) {
+        throw StateError('Entry not found.');
+      }
+      final current = snapshot.data() ?? <String, dynamic>{};
+      final wasCheckedIn = current['checkedIn'] as bool? ?? false;
+      if (wasCheckedIn == checkedIn) {
+        return;
+      }
+
+      transaction.update(entryRef, <String, Object>{
+        'checkedIn': checkedIn,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      transaction.update(categoryRef, <String, Object>{
+        'checkedInPairs': FieldValue.increment(checkedIn ? 1 : -1),
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
     });
   }
 }

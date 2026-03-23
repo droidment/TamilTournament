@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../theme/app_theme.dart';
 import '../../entries/presentation/entries_section.dart';
+import '../../scheduler/presentation/scheduling_seed_section.dart';
 import '../data/tournament_providers.dart';
 import '../domain/tournament.dart';
 import 'categories_section.dart';
@@ -123,6 +124,8 @@ final class _TournamentDetailBody extends StatelessWidget {
         CategoriesSection(tournamentId: tournament.id),
         const SizedBox(height: AppSpace.lg),
         EntriesSection(tournamentId: tournament.id),
+        const SizedBox(height: AppSpace.lg),
+        SchedulingSeedSection(tournamentId: tournament.id),
       ],
     );
   }

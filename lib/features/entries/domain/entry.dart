@@ -4,6 +4,7 @@ final class TournamentEntry {
   const TournamentEntry({
     required this.id,
     required this.tournamentId,
+    required this.categoryId,
     required this.playerOne,
     required this.playerTwo,
     required this.categoryName,
@@ -14,6 +15,7 @@ final class TournamentEntry {
 
   final String id;
   final String tournamentId;
+  final String categoryId;
   final String playerOne;
   final String playerTwo;
   final String categoryName;
@@ -28,6 +30,7 @@ final class TournamentEntry {
     return TournamentEntry(
       id: doc.id,
       tournamentId: data['tournamentId'] as String? ?? '',
+      categoryId: data['categoryId'] as String? ?? '',
       playerOne: (data['playerOne'] as String?)?.trim().isNotEmpty == true
           ? (data['playerOne'] as String).trim()
           : 'Player One',
@@ -45,6 +48,7 @@ final class TournamentEntry {
 
   Map<String, Object> toCreateMap({
     required String tournamentId,
+    required String categoryId,
     required String playerOne,
     required String playerTwo,
     required String categoryName,
@@ -52,6 +56,7 @@ final class TournamentEntry {
     final now = FieldValue.serverTimestamp();
     return <String, Object>{
       'tournamentId': tournamentId,
+      'categoryId': categoryId,
       'playerOne': playerOne.trim(),
       'playerTwo': playerTwo.trim(),
       'categoryName': categoryName.trim(),
