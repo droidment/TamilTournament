@@ -61,15 +61,19 @@ final schedulingSeedStateProvider =
         );
       }
       if (seedPlans.hasError) {
-        return AsyncError(
-          seedPlans.error!,
-          seedPlans.stackTrace ?? StackTrace.current,
-        );
+        if (!_isPermissionDenied(seedPlans.error)) {
+          return AsyncError(
+            seedPlans.error!,
+            seedPlans.stackTrace ?? StackTrace.current,
+          );
+        }
       }
 
       final categoriesData = categories.asData?.value;
       final entriesData = entries.asData?.value;
-      final seedPlansData = seedPlans.asData?.value;
+      final seedPlansData = seedPlans.hasError
+          ? const <SchedulingSeedPlan>[]
+          : seedPlans.asData?.value;
       if (categoriesData == null ||
           entriesData == null ||
           seedPlansData == null) {
@@ -84,6 +88,10 @@ final schedulingSeedStateProvider =
         ),
       );
     });
+
+bool _isPermissionDenied(Object? error) {
+  return error is FirebaseException && error.code == 'permission-denied';
+}
 
 final readyCategoriesProvider =
     Provider.family<List<ReadyCategorySeed>, String>((ref, tournamentId) {

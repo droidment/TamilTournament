@@ -52,7 +52,7 @@ final class _SchedulingSeedSectionState
                     ),
                     const SizedBox(height: AppSpace.xs),
                     Text(
-                      'Adjust the live seed order per category, then save it to Firestore for the scheduler to use.',
+                      'Start from assigned entry seeds, adjust the live order per category, then save it to Firestore for the scheduler.',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: AppPalette.inkSoft,
                       ),
@@ -700,11 +700,23 @@ final class _SeedEntryTile extends StatelessWidget {
                 Text(
                   hasMoved
                       ? 'Moved from suggested seed #$originalSeedNumber.'
+                      : entry.hasAssignedSeed
+                      ? 'Suggested by assigned seed #${entry.seedNumber}.'
                       : 'Suggested by check-in order.',
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: AppPalette.inkSoft,
                   ),
                 ),
+                if (entry.teamName.trim().isNotEmpty &&
+                    entry.rosterLabel.isNotEmpty) ...[
+                  const SizedBox(height: AppSpace.xs),
+                  Text(
+                    entry.rosterLabel,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppPalette.inkMuted,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -1143,18 +1155,7 @@ List<_DraftMatchupPreview> _buildDraftMatchups(
 }
 
 String _entryLabel(TournamentEntry entry) {
-  final playerOne = entry.playerOne.trim();
-  final playerTwo = entry.playerTwo.trim();
-  if (playerOne.isNotEmpty && playerTwo.isNotEmpty) {
-    return '$playerOne / $playerTwo';
-  }
-  if (playerOne.isNotEmpty) {
-    return playerOne;
-  }
-  if (playerTwo.isNotEmpty) {
-    return playerTwo;
-  }
-  return 'Unnamed entry';
+  return entry.displayLabel;
 }
 
 bool _sameIds(List<String> left, List<String> right) {

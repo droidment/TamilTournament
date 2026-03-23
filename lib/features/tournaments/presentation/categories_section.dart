@@ -248,6 +248,26 @@ final class _CategoryRowCard extends StatelessWidget {
       CategoryFormat.group => AppPalette.sageStrong,
       CategoryFormat.knockout => AppPalette.apricot,
     };
+    final chips = [
+      _CategoryChip(
+        label: category.format.label,
+        tint: accent.withValues(alpha: 0.18),
+        border: accent.withValues(alpha: 0.45),
+        foreground: AppPalette.ink,
+      ),
+      _CategoryChip(
+        label: '${category.minPlayers} min',
+        tint: AppPalette.skySoft,
+        border: AppPalette.sky.withValues(alpha: 0.45),
+        foreground: const Color(0xFF456F77),
+      ),
+      _CategoryChip(
+        label: '${category.checkedInPairs} checked in',
+        tint: AppPalette.oliveSoft,
+        border: AppPalette.oliveStrong.withValues(alpha: 0.45),
+        foreground: const Color(0xFF5F7243),
+      ),
+    ];
 
     return Container(
       decoration: BoxDecoration(
@@ -268,49 +288,53 @@ final class _CategoryRowCard extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.all(AppSpace.lg),
-            child: Row(
-              children: [
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(category.name, style: theme.textTheme.titleLarge),
-                      const SizedBox(height: AppSpace.xs),
-                      Text(
-                        '${category.format.label} · min ${category.minPlayers} players',
-                        style: theme.textTheme.bodyMedium?.copyWith(
-                          color: AppPalette.inkSoft,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Wrap(
-                  spacing: AppSpace.sm,
-                  runSpacing: AppSpace.sm,
-                  alignment: WrapAlignment.end,
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final isCompact = constraints.maxWidth < 760;
+
+                final details = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _CategoryChip(
-                      label: category.format.label,
-                      tint: accent.withValues(alpha: 0.18),
-                      border: accent.withValues(alpha: 0.45),
-                      foreground: AppPalette.ink,
-                    ),
-                    _CategoryChip(
-                      label: '${category.minPlayers} min',
-                      tint: AppPalette.skySoft,
-                      border: AppPalette.sky.withValues(alpha: 0.45),
-                      foreground: const Color(0xFF456F77),
-                    ),
-                    _CategoryChip(
-                      label: '${category.checkedInPairs} checked in',
-                      tint: AppPalette.oliveSoft,
-                      border: AppPalette.oliveStrong.withValues(alpha: 0.45),
-                      foreground: const Color(0xFF5F7243),
+                    Text(category.name, style: theme.textTheme.titleLarge),
+                    const SizedBox(height: AppSpace.xs),
+                    Text(
+                      '${category.format.label} · min ${category.minPlayers} players',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppPalette.inkSoft,
+                      ),
                     ),
                   ],
-                ),
-              ],
+                );
+
+                final chipWrap = Wrap(
+                  spacing: AppSpace.sm,
+                  runSpacing: AppSpace.sm,
+                  alignment: isCompact
+                      ? WrapAlignment.start
+                      : WrapAlignment.end,
+                  children: chips,
+                );
+
+                if (isCompact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      details,
+                      const SizedBox(height: AppSpace.md),
+                      chipWrap,
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(child: details),
+                    const SizedBox(width: AppSpace.md),
+                    Flexible(child: chipWrap),
+                  ],
+                );
+              },
             ),
           ),
         ],

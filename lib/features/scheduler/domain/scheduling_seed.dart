@@ -171,7 +171,7 @@ SchedulingSeedSnapshot deriveSchedulingSeedSnapshot({
       continue;
     }
 
-    checkedInEntries.sort(_compareEntries);
+    checkedInEntries.sort(compareEntriesForSeeding);
     final seedPlan = seedPlanByCategoryId[category.id];
     final orderedEntries = _orderCheckedInEntries(
       checkedInEntries,
@@ -265,14 +265,8 @@ List<SeedMatchup> _buildMatchups(
         categoryId: category.id,
         categoryName: category.name,
         seedNumber: (index ~/ 2) + 1,
-        playerOne: playerOne.playerOne.isNotEmpty
-            ? playerOne.playerOne
-            : playerOne.playerTwo,
-        playerTwo: hasPartner
-            ? (playerTwo!.playerOne.isNotEmpty
-                  ? playerTwo.playerOne
-                  : playerTwo.playerTwo)
-            : 'Bye',
+        playerOne: playerOne.displayLabel,
+        playerTwo: hasPartner ? playerTwo!.displayLabel : 'Bye',
         playerOneEntryId: playerOne.id,
         playerTwoEntryId: playerTwo?.id,
         hasBye: !hasPartner,
@@ -280,27 +274,6 @@ List<SeedMatchup> _buildMatchups(
     );
   }
   return matchups;
-}
-
-int _compareEntries(TournamentEntry left, TournamentEntry right) {
-  final leftCreatedAt = left.createdAt ?? left.updatedAt;
-  final rightCreatedAt = right.createdAt ?? right.updatedAt;
-
-  final leftTime = leftCreatedAt?.millisecondsSinceEpoch ?? 0;
-  final rightTime = rightCreatedAt?.millisecondsSinceEpoch ?? 0;
-  final byTime = leftTime.compareTo(rightTime);
-  if (byTime != 0) {
-    return byTime;
-  }
-
-  final byFirst = left.playerOne.toLowerCase().compareTo(
-    right.playerOne.toLowerCase(),
-  );
-  if (byFirst != 0) {
-    return byFirst;
-  }
-
-  return left.id.compareTo(right.id);
 }
 
 String _normalize(String value) {

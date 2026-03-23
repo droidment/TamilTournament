@@ -20,116 +20,12 @@ class _TournamentWorkspacePanelState
   bool _isCreating = false;
 
   Future<void> _showCreateTournamentDialog() async {
-    final formKey = GlobalKey<FormState>();
-    final nameController = TextEditingController();
-    final venueController = TextEditingController();
-    var selectedDate = DateTime.now();
-
-    final shouldCreate = await showDialog<bool>(
+    final draft = await showDialog<_CreateTournamentDraftData>(
       context: context,
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setDialogState) {
-            return AlertDialog(
-              backgroundColor: AppPalette.surface,
-              surfaceTintColor: Colors.transparent,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppRadii.panel),
-                side: const BorderSide(color: AppPalette.line),
-              ),
-              title: const Text('Create tournament draft'),
-              content: SizedBox(
-                width: 420,
-                child: Form(
-                  key: formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      TextFormField(
-                        controller: nameController,
-                        decoration: const InputDecoration(
-                          labelText: 'Tournament name',
-                          hintText: 'Tamil Open 2026',
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Enter a tournament name.';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: AppSpace.md),
-                      TextFormField(
-                        controller: venueController,
-                        decoration: const InputDecoration(
-                          labelText: 'Venue',
-                          hintText: 'Community center or school gym',
-                        ),
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Enter a venue.';
-                          }
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: AppSpace.md),
-                      Align(
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Start date',
-                          style: Theme.of(context).textTheme.labelMedium,
-                        ),
-                      ),
-                      const SizedBox(height: AppSpace.sm),
-                      OutlinedButton(
-                        onPressed: () async {
-                          final pickedDate = await showDatePicker(
-                            context: context,
-                            initialDate: selectedDate,
-                            firstDate: DateTime.now().subtract(
-                              const Duration(days: 365),
-                            ),
-                            lastDate: DateTime.now().add(
-                              const Duration(days: 730),
-                            ),
-                          );
-                          if (pickedDate == null) {
-                            return;
-                          }
-                          setDialogState(() {
-                            selectedDate = pickedDate;
-                          });
-                        },
-                        child: Text(_formatDate(selectedDate)),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: const Text('Cancel'),
-                ),
-                FilledButton(
-                  onPressed: () {
-                    if (formKey.currentState?.validate() != true) {
-                      return;
-                    }
-                    Navigator.of(context).pop(true);
-                  },
-                  child: const Text('Create draft'),
-                ),
-              ],
-            );
-          },
-        );
-      },
+      builder: (context) => const _CreateTournamentDraftDialog(),
     );
 
-    if (shouldCreate != true || !mounted) {
-      nameController.dispose();
-      venueController.dispose();
+    if (draft == null || !mounted) {
       return;
     }
 
@@ -146,9 +42,9 @@ class _TournamentWorkspacePanelState
           .read(tournamentRepositoryProvider)
           .createDraftTournament(
             organizerUid: user.uid,
-            name: nameController.text,
-            venue: venueController.text,
-            startDate: selectedDate,
+            name: draft.name,
+            venue: draft.venue,
+            startDate: draft.startDate,
           );
       if (!mounted) {
         return;
@@ -164,8 +60,6 @@ class _TournamentWorkspacePanelState
         context,
       ).showSnackBar(SnackBar(content: Text(_friendlyError(error))));
     } finally {
-      nameController.dispose();
-      venueController.dispose();
       if (mounted) {
         setState(() {
           _isCreating = false;
@@ -242,6 +136,148 @@ class _TournamentWorkspacePanelState
           ),
         ],
       ),
+    );
+  }
+}
+
+final class _CreateTournamentDraftData {
+  const _CreateTournamentDraftData({
+    required this.name,
+    required this.venue,
+    required this.startDate,
+  });
+
+  final String name;
+  final String venue;
+  final DateTime startDate;
+}
+
+final class _CreateTournamentDraftDialog extends StatefulWidget {
+  const _CreateTournamentDraftDialog();
+
+  @override
+  State<_CreateTournamentDraftDialog> createState() =>
+      _CreateTournamentDraftDialogState();
+}
+
+class _CreateTournamentDraftDialogState
+    extends State<_CreateTournamentDraftDialog> {
+  final _formKey = GlobalKey<FormState>();
+  late final TextEditingController _nameController;
+  late final TextEditingController _venueController;
+  late DateTime _selectedDate;
+
+  @override
+  void initState() {
+    super.initState();
+    _nameController = TextEditingController();
+    _venueController = TextEditingController();
+    _selectedDate = DateTime.now();
+  }
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _venueController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _pickStartDate() async {
+    final pickedDate = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime.now().subtract(const Duration(days: 365)),
+      lastDate: DateTime.now().add(const Duration(days: 730)),
+    );
+    if (pickedDate == null || !mounted) {
+      return;
+    }
+    setState(() {
+      _selectedDate = pickedDate;
+    });
+  }
+
+  void _submit() {
+    if (_formKey.currentState?.validate() != true) {
+      return;
+    }
+    Navigator.of(context).pop(
+      _CreateTournamentDraftData(
+        name: _nameController.text.trim(),
+        venue: _venueController.text.trim(),
+        startDate: _selectedDate,
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: AppPalette.surface,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        side: const BorderSide(color: AppPalette.line),
+      ),
+      title: const Text('Create tournament draft'),
+      content: SizedBox(
+        width: 420,
+        child: Form(
+          key: _formKey,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _nameController,
+                decoration: const InputDecoration(
+                  labelText: 'Tournament name',
+                  hintText: 'Tamil Open 2026',
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Enter a tournament name.';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: AppSpace.md),
+              TextFormField(
+                controller: _venueController,
+                decoration: const InputDecoration(
+                  labelText: 'Venue',
+                  hintText: 'Community center or school gym',
+                ),
+                validator: (value) {
+                  if (value == null || value.trim().isEmpty) {
+                    return 'Enter a venue.';
+                  }
+                  return null;
+                },
+              ),
+              const SizedBox(height: AppSpace.md),
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Start date',
+                  style: Theme.of(context).textTheme.labelMedium,
+                ),
+              ),
+              const SizedBox(height: AppSpace.sm),
+              OutlinedButton(
+                onPressed: _pickStartDate,
+                child: Text(_formatDate(_selectedDate)),
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(onPressed: _submit, child: const Text('Create draft')),
+      ],
     );
   }
 }
