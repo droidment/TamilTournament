@@ -38,6 +38,31 @@ service cloud.firestore {
       match /entries/{entryId} {
         allow read, create, update, delete: if isTournamentOrganizer(tournamentId);
       }
+
+      match /seedPlans/{categoryId} {
+        function validSeedPlan() {
+          return request.resource.data.keys().hasOnly([
+            'tournamentId',
+            'categoryId',
+            'categoryName',
+            'format',
+            'seedEntryIds',
+            'createdAt',
+            'updatedAt',
+          ])
+            && request.resource.data.tournamentId == tournamentId
+            && request.resource.data.categoryId == categoryId
+            && request.resource.data.categoryName is string
+            && request.resource.data.categoryName.size() > 0
+            && request.resource.data.format in ['group', 'knockout']
+            && request.resource.data.seedEntryIds is list
+            && request.resource.data.seedEntryIds.size() >= 2;
+        }
+
+        allow read, delete: if isTournamentOrganizer(tournamentId);
+        allow create, update: if isTournamentOrganizer(tournamentId)
+          && validSeedPlan();
+      }
     }
 
     match /categories/{categoryId} {
