@@ -29,10 +29,41 @@
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>tamil_tournament</title>
+  <title>Tamil Tournament</title>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>
-  <script src="flutter_bootstrap.js" async></script>
+  <script>
+    async function clearLegacyFlutterCaches() {
+      if ('serviceWorker' in navigator) {
+        try {
+          const registrations = await navigator.serviceWorker.getRegistrations();
+          await Promise.all(
+            registrations.map((registration) => registration.unregister()),
+          );
+        } catch (error) {
+          console.warn('Unable to unregister service workers.', error);
+        }
+      }
+
+      if ('caches' in window) {
+        try {
+          const cacheKeys = await caches.keys();
+          await Promise.all(cacheKeys.map((key) => caches.delete(key)));
+        } catch (error) {
+          console.warn('Unable to clear browser caches.', error);
+        }
+      }
+    }
+
+    window.addEventListener('load', () => {
+      clearLegacyFlutterCaches().finally(() => {
+        const script = document.createElement('script');
+        script.src = 'flutter_bootstrap.js?v=20260323-3';
+        script.async = true;
+        document.body.appendChild(script);
+      });
+    });
+  </script>
 </body>
 </html>
