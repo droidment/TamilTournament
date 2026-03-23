@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../../../firebase/firebase_status.dart';
 import '../../../theme/app_theme.dart';
+import '../../tournaments/presentation/tournament_workspace_panel.dart';
 
 final class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -39,6 +40,8 @@ final class _DashboardContent extends StatelessWidget {
         _OverviewRow(),
         SizedBox(height: AppSpace.lg),
         _WorkArea(),
+        SizedBox(height: AppSpace.lg),
+        TournamentWorkspacePanel(),
         SizedBox(height: AppSpace.lg),
         _FirebaseNotice(),
       ],
