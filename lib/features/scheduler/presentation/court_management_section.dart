@@ -271,25 +271,26 @@ class _CourtManagementSectionState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Courts', style: theme.textTheme.headlineMedium),
-                    const SizedBox(height: AppSpace.xs),
-                    Text(
-                      'Set the active court pool before live scheduling begins, then pause or restore courts as the venue changes.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppPalette.inkSoft,
-                      ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 760;
+
+              final titleBlock = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Courts', style: theme.textTheme.headlineMedium),
+                  const SizedBox(height: AppSpace.xs),
+                  Text(
+                    'Set the active court pool before live scheduling begins, then pause or restore courts as the venue changes.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppPalette.inkSoft,
                     ),
-                  ],
-                ),
-              ),
-              courts.whenOrNull(
+                  ),
+                ],
+              );
+
+              final metrics =
+                  courts.whenOrNull(
                     data: (items) {
                       final available = items
                           .where((court) => court.isAvailable)
@@ -297,6 +298,9 @@ class _CourtManagementSectionState
                       return Wrap(
                         spacing: AppSpace.sm,
                         runSpacing: AppSpace.sm,
+                        alignment: isCompact
+                            ? WrapAlignment.start
+                            : WrapAlignment.end,
                         children: [
                           _CourtSummaryChip(
                             label: '${items.length} total',
@@ -320,8 +324,28 @@ class _CourtManagementSectionState
                       );
                     },
                   ) ??
-                  const SizedBox.shrink(),
-            ],
+                  const SizedBox.shrink();
+
+              if (isCompact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    titleBlock,
+                    const SizedBox(height: AppSpace.md),
+                    metrics,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: titleBlock),
+                  const SizedBox(width: AppSpace.md),
+                  Flexible(child: metrics),
+                ],
+              );
+            },
           ),
           const SizedBox(height: AppSpace.lg),
           _CourtSetupBar(

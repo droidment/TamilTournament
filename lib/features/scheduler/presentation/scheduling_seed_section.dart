@@ -39,34 +39,37 @@ final class _SchedulingSeedSectionState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Scheduling seeds',
-                      style: theme.textTheme.headlineMedium,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 760;
+
+              final titleBlock = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Scheduling seeds',
+                    style: theme.textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: AppSpace.xs),
+                  Text(
+                    'Start from assigned entry seeds, adjust the live order per category, then save it to Firestore for the scheduler.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppPalette.inkSoft,
                     ),
-                    const SizedBox(height: AppSpace.xs),
-                    Text(
-                      'Start from assigned entry seeds, adjust the live order per category, then save it to Firestore for the scheduler.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppPalette.inkSoft,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              state.whenOrNull(
+                  ),
+                ],
+              );
+
+              final metrics =
+                  state.whenOrNull(
                     data: (snapshot) {
                       _syncLocalDrafts(snapshot);
                       return Wrap(
                         spacing: AppSpace.sm,
                         runSpacing: AppSpace.sm,
-                        alignment: WrapAlignment.end,
+                        alignment: isCompact
+                            ? WrapAlignment.start
+                            : WrapAlignment.end,
                         children: [
                           _StatusChip(
                             label: '${snapshot.readyCategories.length} ready',
@@ -100,8 +103,28 @@ final class _SchedulingSeedSectionState
                       );
                     },
                   ) ??
-                  const SizedBox.shrink(),
-            ],
+                  const SizedBox.shrink();
+
+              if (isCompact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    titleBlock,
+                    const SizedBox(height: AppSpace.md),
+                    metrics,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: titleBlock),
+                  const SizedBox(width: AppSpace.md),
+                  Flexible(child: metrics),
+                ],
+              );
+            },
           ),
           const SizedBox(height: AppSpace.lg),
           state.when(

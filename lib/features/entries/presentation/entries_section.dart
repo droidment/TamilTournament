@@ -262,27 +262,28 @@ class _EntriesSectionState extends ConsumerState<EntriesSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Player and team onboarding',
-                      style: theme.textTheme.headlineMedium,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 760;
+
+              final titleBlock = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Player and team onboarding',
+                    style: theme.textTheme.headlineMedium,
+                  ),
+                  const SizedBox(height: AppSpace.xs),
+                  Text(
+                    'Capture teams, assign category seeds, and mark them checked in as they arrive.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppPalette.inkSoft,
                     ),
-                    const SizedBox(height: AppSpace.xs),
-                    Text(
-                      'Capture teams, assign category seeds, and mark them checked in as they arrive.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppPalette.inkSoft,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              FilledButton(
+                  ),
+                ],
+              );
+
+              final action = FilledButton(
                 onPressed: canCreateEntry
                     ? () => _showCreateEntryDialog(
                         categories: categoryItems,
@@ -290,8 +291,28 @@ class _EntriesSectionState extends ConsumerState<EntriesSection> {
                       )
                     : null,
                 child: Text(_isCreating ? 'Saving...' : 'Onboard team'),
-              ),
-            ],
+              );
+
+              if (isCompact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    titleBlock,
+                    const SizedBox(height: AppSpace.md),
+                    action,
+                  ],
+                );
+              }
+
+              return Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: titleBlock),
+                  const SizedBox(width: AppSpace.md),
+                  action,
+                ],
+              );
+            },
           ),
           const SizedBox(height: AppSpace.lg),
           entries.when(

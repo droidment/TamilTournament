@@ -187,28 +187,48 @@ final class _CategoriesSectionState extends ConsumerState<CategoriesSection> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('Categories', style: theme.textTheme.headlineMedium),
-                    const SizedBox(height: AppSpace.xs),
-                    Text(
-                      'Tournament-scoped category setup and drafts.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppPalette.inkSoft,
-                      ),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 720;
+
+              final titleBlock = Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Categories', style: theme.textTheme.headlineMedium),
+                  const SizedBox(height: AppSpace.xs),
+                  Text(
+                    'Tournament-scoped category setup and drafts.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppPalette.inkSoft,
                     ),
-                  ],
-                ),
-              ),
-              FilledButton(
+                  ),
+                ],
+              );
+
+              final action = FilledButton(
                 onPressed: _isCreating ? null : _showCreateCategoryDialog,
                 child: Text(_isCreating ? 'Creating...' : 'New category'),
-              ),
-            ],
+              );
+
+              if (isCompact) {
+                return Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    titleBlock,
+                    const SizedBox(height: AppSpace.md),
+                    action,
+                  ],
+                );
+              }
+
+              return Row(
+                children: [
+                  Expanded(child: titleBlock),
+                  const SizedBox(width: AppSpace.md),
+                  action,
+                ],
+              );
+            },
           ),
           const SizedBox(height: AppSpace.lg),
           categories.when(
