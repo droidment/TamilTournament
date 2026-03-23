@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Soft Neutral Sage Scheduler Mockup</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
+    <style>
+      :root {
+        --bg: #f6f1e8;
+        --bg-shade: #efe7db;
+        --surface: #fffdf9;
+        --surface-soft: #faf6ef;
+        --surface-soft-strong: #f6f0e6;
+        --line: #ddd3c4;
+        --line-strong: #cabdaa;
+        --ink: #2f3a34;
+        --ink-soft: #5d6b63;
+        --ink-muted: #839087;
+        --sage: #98bfa6;
+        --sage-strong: #6f9a82;
+        --sage-soft: #dce9e0;
+        --butter: #e9d9a5;
+        --terracotta: #c97d6b;
+        --olive: #dbe5c6;
+        --shadow: 0 24px 50px -34px rgba(68, 56, 40, 0.28);
+        --shadow-lift: 0 18px 30px -22px rgba(111, 154, 130, 0.38);
+        --radius-xl: 30px;
+        --radius-lg: 24px;
+        --radius-md: 18px;
+        --radius-sm: 14px;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      body {
+        font-family: "Plus Jakarta Sans", system-ui, sans-serif;
+        color: var(--ink);
+        background:
+          radial-gradient(circle at top left, rgba(233, 217, 165, 0.28), transparent 24%),
+          radial-gradient(circle at top right, rgba(152, 191, 166, 0.18), transparent 20%),
+          linear-gradient(180deg, #f9f5ef 0%, var(--bg) 100%);
+      }
+
+      .shell {
+        width: min(1460px, calc(100vw - 40px));
+        margin: 22px auto;
+        display: grid;
+        grid-template-columns: 260px minmax(0, 1fr);
+        gap: 22px;
+      }
+
+      .sidebar,
+      .topbar,
+      .summary-card,
+      .panel,
+      .queue-item,
+      .court,
+      .approval-card {
+        background: var(--surface);
+        border: 1px solid rgba(221, 211, 196, 0.92);
+        box-shadow: var(--shadow);
+      }
+
+      .sidebar {
+        min-height: calc(100dvh - 44px);
+        position: sticky;
+        top: 22px;
+        padding: 22px;
+        border-radius: var(--radius-xl);
+        display: flex;
+        flex-direction: column;
+      }
+
+      .brand {
+        display: flex;
+        align-items: center;
+        gap: 12px;
+        margin-bottom: 26px;
+      }
+
+      .brand-mark {
+        width: 44px;
+        height: 44px;
+        border-radius: 16px;
+        background: linear-gradient(135deg, var(--sage), #f6f4ee);
+        color: var(--ink);
+        display: grid;
+        place-items: center;
+        font-weight: 700;
+      }
+
+      .brand h1 {
+        margin: 0;
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .brand p {
+        margin: 4px 0 0;
+        font-size: 12px;
+        color: var(--ink-muted);
+      }
+
+      .nav-group {
+        display: grid;
+        gap: 8px;
+        margin-bottom: 20px;
+      }
+
+      .nav-label {
+        padding: 0 10px;
+        color: var(--ink-muted);
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.12em;
+      }
+
+      .nav-item {
+        padding: 14px 16px;
+        border-radius: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        color: var(--ink-soft);
+        font-size: 14px;
+      }
+
+      .nav-item.active {
+        background:
+          linear-gradient(180deg, rgba(152, 191, 166, 0.18), rgba(220, 233, 224, 0.38)),
+          var(--surface-soft);
+        color: var(--ink);
+        border: 1px solid rgba(152, 191, 166, 0.3);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.72),
+          var(--shadow-lift);
+      }
+
+      .pill {
+        min-width: 28px;
+        height: 28px;
+        padding: 0 10px;
+        border-radius: 999px;
+        display: grid;
+        place-items: center;
+        font-size: 12px;
+        color: var(--ink-soft);
+        background: var(--surface-soft);
+        border: 1px solid var(--line);
+      }
+
+      .profile-card {
+        margin-top: auto;
+        background: var(--surface-soft);
+        border: 1px solid var(--line);
+        border-radius: 22px;
+        padding: 16px;
+      }
+
+      .profile-name {
+        margin: 0;
+        font-size: 14px;
+        font-weight: 600;
+      }
+
+      .profile-role {
+        margin: 4px 0 0;
+        font-size: 12px;
+        color: var(--ink-muted);
+      }
+
+      .main {
+        display: grid;
+        gap: 18px;
+      }
+
+      .topbar {
+        border-radius: var(--radius-xl);
+        padding: 28px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+      }
+
+      .headline h2 {
+        margin: 0;
+        font-size: 32px;
+        font-weight: 600;
+        letter-spacing: -0.05em;
+      }
+
+      .headline p {
+        margin: 10px 0 0;
+        color: var(--ink-soft);
+        font-size: 14px;
+      }
+
+      .actions {
+        display: flex;
+        gap: 12px;
+        align-items: center;
+      }
+
+      .chip,
+      .button,
+      .mini-button {
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        background: var(--surface);
+        color: var(--ink);
+        font-family: inherit;
+      }
+
+      .chip,
+      .button {
+        padding: 12px 16px;
+        font-size: 13px;
+      }
+
+      .button.primary {
+        background: linear-gradient(180deg, #a9ccb7, #8fb69d);
+        border-color: rgba(111, 154, 130, 0.35);
+        color: #243129;
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.45),
+          0 12px 24px -18px rgba(111, 154, 130, 0.72);
+      }
+
+      .button.soft {
+        background: var(--surface-soft);
+      }
+
+      .summary-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 16px;
+      }
+
+      .summary-card {
+        border-radius: 24px;
+        padding: 18px;
+      }
+
+      .summary-label {
+        font-size: 12px;
+        color: var(--ink-muted);
+      }
+
+      .summary-value {
+        margin-top: 12px;
+        font-size: 32px;
+        font-weight: 600;
+        letter-spacing: -0.05em;
+      }
+
+      .summary-meta {
+        margin-top: 12px;
+        font-size: 12px;
+        color: var(--ink-soft);
+        padding-top: 12px;
+        border-top: 1px solid rgba(221, 211, 196, 0.7);
+      }
+
+      .dashboard-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.35fr) minmax(340px, 0.8fr);
+        gap: 18px;
+      }
+
+      .panel {
+        border-radius: var(--radius-xl);
+        padding: 22px;
+      }
+
+      .panel-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 18px;
+      }
+
+      .panel-title {
+        font-size: 18px;
+        font-weight: 600;
+      }
+
+      .panel-meta {
+        margin-top: 5px;
+        color: var(--ink-muted);
+        font-size: 12px;
+      }
+
+      .queue-list,
+      .approval-list {
+        display: grid;
+        gap: 14px;
+      }
+
+      .queue-item,
+      .approval-card {
+        border-radius: 24px;
+        padding: 18px;
+      }
+
+      .queue-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 12px;
+      }
+
+      .queue-title {
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .queue-subtitle {
+        margin-top: 7px;
+        font-size: 13px;
+        color: var(--ink-soft);
+      }
+
+      .mono {
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 13px;
+        color: var(--ink-soft);
+      }
+
+      .status-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-top: 14px;
+      }
+
+      .status {
+        padding: 8px 10px;
+        border-radius: 999px;
+        font-size: 12px;
+        border: 1px solid transparent;
+      }
+
+      .status.ready {
+        background: rgba(152, 191, 166, 0.18);
+        border-color: rgba(111, 154, 130, 0.3);
+        color: #365141;
+      }
+
+      .status.wait {
+        background: rgba(233, 217, 165, 0.26);
+        border-color: rgba(204, 183, 120, 0.34);
+        color: #6f6241;
+      }
+
+      .status.conflict {
+        background: rgba(201, 125, 107, 0.14);
+        border-color: rgba(201, 125, 107, 0.28);
+        color: #7b4d42;
+      }
+
+      .queue-actions,
+      .approval-actions {
+        display: flex;
+        gap: 10px;
+        margin-top: 16px;
+      }
+
+      .mini-button {
+        padding: 10px 14px;
+        font-size: 13px;
+      }
+
+      .mini-button.primary {
+        background: linear-gradient(180deg, #a9ccb7, #8fb69d);
+        border-color: rgba(111, 154, 130, 0.35);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 255, 255, 0.42),
+          0 10px 20px -18px rgba(111, 154, 130, 0.8);
+      }
+
+      .courts-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      .court {
+        border-radius: 24px;
+        min-height: 190px;
+        padding: 18px;
+        position: relative;
+        overflow: hidden;
+      }
+
+      .court.live {
+        border-top: 4px solid var(--sage-strong);
+      }
+
+      .court.open {
+        border-top: 4px solid #b5c595;
+      }
+
+      .court.pause {
+        border-top: 4px solid #d0ad73;
+      }
+
+      .court.called {
+        border-top: 4px solid #c29379;
+      }
+
+      .court::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        pointer-events: none;
+        border-radius: inherit;
+        background: linear-gradient(180deg, rgba(255, 255, 255, 0.32), transparent 28%);
+        opacity: 0.9;
+      }
+
+      .court::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        top: 0;
+        width: 100%;
+        height: 44px;
+        pointer-events: none;
+        border-top-left-radius: inherit;
+        border-top-right-radius: inherit;
+        background: linear-gradient(180deg, rgba(152, 191, 166, 0.06), transparent 90%);
+      }
+
+      .court.open::after {
+        background: linear-gradient(180deg, rgba(185, 201, 136, 0.1), transparent 90%);
+      }
+
+      .court.pause::after {
+        background: linear-gradient(180deg, rgba(208, 173, 115, 0.12), transparent 90%);
+      }
+
+      .court.called::after {
+        background: linear-gradient(180deg, rgba(194, 147, 121, 0.1), transparent 90%);
+      }
+
+      .court-top {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 18px;
+      }
+
+      .court-state {
+        padding: 7px 10px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        font-size: 12px;
+        background: var(--surface-soft);
+      }
+
+      .court-match {
+        font-size: 16px;
+        font-weight: 600;
+        line-height: 1.45;
+      }
+
+      .court-meta {
+        margin-top: 10px;
+        color: var(--ink-soft);
+        font-size: 13px;
+      }
+
+      .note {
+        margin-top: 16px;
+        padding: 14px 16px;
+        border-radius: 18px;
+        background: var(--surface-soft);
+        border: 1px dashed var(--line-strong);
+        color: var(--ink-soft);
+        font-size: 13px;
+      }
+
+      .gradient-note {
+        margin-top: 12px;
+        color: var(--ink-muted);
+        font-size: 12px;
+        line-height: 1.5;
+      }
+
+      .approval-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+      }
+
+      .approval-match {
+        margin-top: 12px;
+        font-size: 16px;
+        font-weight: 600;
+      }
+
+      .score-line {
+        margin-top: 16px;
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 10px;
+      }
+
+      .score-box {
+        padding: 14px 12px;
+        border-radius: 18px;
+        background: var(--surface-soft);
+        border: 1px solid var(--line);
+        text-align: center;
+      }
+
+      .score-game {
+        font-size: 11px;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: var(--ink-muted);
+      }
+
+      .score-value {
+        margin-top: 10px;
+        font-family: "IBM Plex Mono", monospace;
+        font-size: 18px;
+      }
+
+      @media (max-width: 1120px) {
+        .shell {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          min-height: auto;
+          position: static;
+        }
+
+        .dashboard-grid {
+          grid-template-columns: 1fr;
+        }
+      }
+
+      @media (max-width: 760px) {
+        .shell {
+          width: min(100vw - 20px, 100%);
+          margin: 10px auto;
+          gap: 14px;
+        }
+
+        .topbar {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 16px;
+          padding: 20px;
+        }
+
+        .summary-grid,
+        .courts-grid,
+        .score-line {
+          grid-template-columns: 1fr;
+        }
+
+        .panel,
+        .sidebar {
+          padding: 18px;
+        }
+
+        .headline h2 {
+          font-size: 25px;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">TT</div>
+          <div>
+            <h1>Tamil Tournament</h1>
+            <p>Soft neutral + sage study</p>
+          </div>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-label">Operations</div>
+          <div class="nav-item">Dashboard <span class="pill">4</span></div>
+          <div class="nav-item active">Scheduler <span class="pill">12</span></div>
+          <div class="nav-item">Courts <span class="pill">10</span></div>
+          <div class="nav-item">Scores <span class="pill">3</span></div>
+        </div>
+
+        <div class="nav-group">
+          <div class="nav-label">Tournament</div>
+          <div class="nav-item">Entries</div>
+          <div class="nav-item">Categories</div>
+          <div class="nav-item">Standings</div>
+          <div class="nav-item">Print Center</div>
+        </div>
+
+        <div class="profile-card">
+          <p class="profile-name">Meena Krishnan</p>
+          <p class="profile-role">Lead organizer</p>
+        </div>
+      </aside>
+
+      <main class="main">
+        <section class="topbar">
+          <div class="headline">
+            <h2>Scheduler board</h2>
+            <p>Saturday, June 14 · 10 active courts · Higher contrast spring direction</p>
+          </div>
+          <div class="actions">
+            <div class="chip">Round robin</div>
+            <button class="button soft">Pause court</button>
+            <button class="button primary">Assign next match</button>
+          </div>
+        </section>
+
+        <section class="summary-grid">
+          <article class="summary-card">
+            <div class="summary-label">Matches live</div>
+            <div class="summary-value">6</div>
+            <div class="summary-meta">2 courts opening soon</div>
+          </article>
+          <article class="summary-card">
+            <div class="summary-label">Ready queue</div>
+            <div class="summary-value">12</div>
+            <div class="summary-meta">3 waiting on overlap</div>
+          </article>
+          <article class="summary-card">
+            <div class="summary-label">Pending scores</div>
+            <div class="summary-value">3</div>
+            <div class="summary-meta">approval target under 5 min</div>
+          </article>
+          <article class="summary-card">
+            <div class="summary-label">Checked in</div>
+            <div class="summary-value">44</div>
+            <div class="summary-meta">4 pairs not yet confirmed</div>
+          </article>
+        </section>
+
+        <section class="dashboard-grid">
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Ready queue</div>
+                <div class="panel-meta">Whiter surfaces, stronger text, spring accent only where useful</div>
+              </div>
+              <div class="chip">12 matches</div>
+            </div>
+
+            <div class="queue-list">
+              <article class="queue-item">
+                <div class="queue-top">
+                  <div>
+                    <div class="queue-title">Men's Open · Group A</div>
+                    <div class="queue-subtitle">Arun / Vimal vs Hari / Satheesh</div>
+                  </div>
+                  <div class="mono">SEQ 014</div>
+                </div>
+                <div class="status-row">
+                  <div class="status ready">Ready now</div>
+                  <div class="status wait">Rested 14m</div>
+                </div>
+                <div class="queue-actions">
+                  <button class="mini-button primary">Assign to court</button>
+                  <button class="mini-button">Hold</button>
+                </div>
+              </article>
+
+              <article class="queue-item">
+                <div class="queue-top">
+                  <div>
+                    <div class="queue-title">40+ · Semifinal</div>
+                    <div class="queue-subtitle">Bala / Mano vs Siva / Rajan</div>
+                  </div>
+                  <div class="mono">SEQ 018</div>
+                </div>
+                <div class="status-row">
+                  <div class="status conflict">Player overlap</div>
+                  <div class="status wait">Unlock in 7m</div>
+                </div>
+                <div class="queue-actions">
+                  <button class="mini-button">Review conflict</button>
+                  <button class="mini-button">Move later</button>
+                </div>
+              </article>
+
+              <article class="queue-item">
+                <div class="queue-top">
+                  <div>
+                    <div class="queue-title">Women's Open · Group B</div>
+                    <div class="queue-subtitle">Nila / Kavya vs Anu / Revathi</div>
+                  </div>
+                  <div class="mono">SEQ 020</div>
+                </div>
+                <div class="status-row">
+                  <div class="status ready">Ready now</div>
+                </div>
+                <div class="queue-actions">
+                  <button class="mini-button primary">Assign to court</button>
+                  <button class="mini-button">Details</button>
+                </div>
+              </article>
+            </div>
+          </div>
+
+          <div class="panel">
+            <div class="panel-header">
+              <div>
+                <div class="panel-title">Live courts</div>
+                <div class="panel-meta">Color now supports status instead of tinting the whole interface</div>
+              </div>
+              <div class="chip">10 active</div>
+            </div>
+
+            <div class="courts-grid">
+              <article class="court live">
+                <div class="court-top">
+                  <div class="mono">COURT 01</div>
+                  <div class="court-state">In progress</div>
+                </div>
+                <div class="court-match">Rakesh / Dinesh vs Mano / Kumar</div>
+                <div class="court-meta">50+ · Game 2 · Started 9:42 AM</div>
+              </article>
+
+              <article class="court open">
+                <div class="court-top">
+                  <div class="mono">COURT 02</div>
+                  <div class="court-state">Open</div>
+                </div>
+                <div class="court-match">Available for next ready match</div>
+                <div class="court-meta">Suggested: Men's Open · Group A</div>
+              </article>
+
+              <article class="court pause">
+                <div class="court-top">
+                  <div class="mono">COURT 03</div>
+                  <div class="court-state">Paused</div>
+                </div>
+                <div class="court-match">Floor wipe in progress</div>
+                <div class="court-meta">Expected return in 8 minutes</div>
+              </article>
+
+              <article class="court called">
+                <div class="court-top">
+                  <div class="mono">COURT 04</div>
+                  <div class="court-state">Called</div>
+                </div>
+                <div class="court-match">Naren / Kobi vs Senthil / Ashok</div>
+                <div class="court-meta">40+ · Players walking to court</div>
+              </article>
+            </div>
+
+            <div class="note">
+              Same layout, different contrast strategy: surfaces are neutral, spring colors mark actions and states.
+            </div>
+            <div class="gradient-note">
+              Gradients work best here as subtle uplifts on selected actions, active navigation, and card-edge highlights. I would avoid large hero-style gradients on the main scheduler canvas.
+            </div>
+          </div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <div class="panel-title">Score approval</div>
+              <div class="panel-meta">A cleaner review lane with stronger separation between data and action</div>
+            </div>
+            <div class="chip">3 pending</div>
+          </div>
+
+          <div class="approval-list">
+            <article class="approval-card">
+              <div class="approval-head">
+                <div class="mono">COURT 05 · Submitted 2m ago</div>
+                <div class="status ready">Pending review</div>
+              </div>
+              <div class="approval-match">Pranav / Surya defeated Jegan / Suresh</div>
+              <div class="score-line">
+                <div class="score-box">
+                  <div class="score-game">Game 1</div>
+                  <div class="score-value">21 - 17</div>
+                </div>
+                <div class="score-box">
+                  <div class="score-game">Game 2</div>
+                  <div class="score-value">18 - 21</div>
+                </div>
+                <div class="score-box">
+                  <div class="score-game">Game 3</div>
+                  <div class="score-value">21 - 16</div>
+                </div>
+              </div>
+              <div class="approval-actions">
+                <button class="mini-button primary">Approve score</button>
+                <button class="mini-button">Request correction</button>
+              </div>
+            </article>
+          </div>
+        </section>
+      </main>
+    </div>
+  </body>
+</html>
