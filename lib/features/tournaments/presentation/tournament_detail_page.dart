@@ -4,6 +4,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../../theme/app_theme.dart';
 import '../../entries/presentation/entries_section.dart';
+import '../../scheduler/presentation/category_schedule_section.dart';
+import '../../scheduler/presentation/court_management_section.dart';
 import '../../scheduler/presentation/scheduling_seed_section.dart';
 import '../data/tournament_providers.dart';
 import '../domain/tournament.dart';
@@ -115,6 +117,12 @@ final class _TournamentDetailBody extends StatelessWidget {
                     border: AppPalette.apricot.withValues(alpha: 0.45),
                     foreground: const Color(0xFF8F6038),
                   ),
+                  _HeaderChip(
+                    label: '${tournament.activeCourtCount} active courts',
+                    tint: AppPalette.sageSoft,
+                    border: AppPalette.sage.withValues(alpha: 0.45),
+                    foreground: const Color(0xFF365141),
+                  ),
                 ],
               ),
             ],
@@ -126,6 +134,13 @@ final class _TournamentDetailBody extends StatelessWidget {
         EntriesSection(tournamentId: tournament.id),
         const SizedBox(height: AppSpace.lg),
         SchedulingSeedSection(tournamentId: tournament.id),
+        const SizedBox(height: AppSpace.lg),
+        CategoryScheduleSection(tournamentId: tournament.id),
+        const SizedBox(height: AppSpace.lg),
+        CourtManagementSection(
+          tournamentId: tournament.id,
+          initialCourtCount: tournament.activeCourtCount,
+        ),
       ],
     );
   }

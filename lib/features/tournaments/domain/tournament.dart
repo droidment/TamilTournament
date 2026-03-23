@@ -61,6 +61,7 @@ final class Tournament {
     required this.startDate,
     required this.organizerUid,
     required this.status,
+    required this.activeCourtCount,
     required this.stats,
     required this.createdAt,
     required this.updatedAt,
@@ -72,6 +73,7 @@ final class Tournament {
   final DateTime startDate;
   final String organizerUid;
   final TournamentStatus status;
+  final int activeCourtCount;
   final TournamentStats stats;
   final DateTime? createdAt;
   final DateTime? updatedAt;
@@ -91,6 +93,7 @@ final class Tournament {
       status: TournamentStatusX.fromValue(
         data['status'] as String? ?? TournamentStatus.draft.value,
       ),
+      activeCourtCount: (data['activeCourtCount'] as num?)?.toInt() ?? 0,
       stats: TournamentStats.fromMap(data['stats'] as Map<String, dynamic>?),
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),

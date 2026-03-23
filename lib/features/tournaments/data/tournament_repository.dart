@@ -54,6 +54,7 @@ final class TournamentRepository {
       'startDate': Timestamp.fromDate(startDate),
       'organizerUid': organizerUid,
       'status': TournamentStatus.draft.value,
+      'activeCourtCount': 0,
       'stats': const TournamentStats(
         categories: 0,
         entries: 0,

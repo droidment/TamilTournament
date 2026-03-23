@@ -19,7 +19,9 @@ final class EntriesSection extends ConsumerStatefulWidget {
 
 class _EntriesSectionState extends ConsumerState<EntriesSection> {
   bool _isCreating = false;
-  final Set<String> _busyEntryIds = <String>{};
+  Set<String>? _busyEntryIdsState;
+
+  Set<String> get _busyEntryIds => _busyEntryIdsState ??= <String>{};
 
   Future<void> _showCreateEntryDialog({
     required List<CategoryItem> categories,
