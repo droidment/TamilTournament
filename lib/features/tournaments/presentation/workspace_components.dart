@@ -30,22 +30,28 @@ final class WorkspaceStatRail extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < 620) {
-          return Column(
+          final compactWidth = metrics.length == 1
+              ? constraints.maxWidth
+              : (constraints.maxWidth - AppSpace.sm) / 2;
+
+          return Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
             children: [
-              for (var index = 0; index < metrics.length; index++) ...[
-                WorkspaceMetricTile(metric: metrics[index]),
-                if (index < metrics.length - 1)
-                  const SizedBox(height: AppSpace.sm),
-              ],
+              for (final metric in metrics)
+                SizedBox(
+                  width: compactWidth,
+                  child: WorkspaceMetricTile(metric: metric),
+                ),
             ],
           );
         }
 
         return Container(
-          padding: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(AppSpace.xs),
           decoration: BoxDecoration(
-            color: AppPalette.surfaceSoft,
-            borderRadius: BorderRadius.circular(26),
+            color: AppPalette.surface,
+            borderRadius: BorderRadius.circular(AppRadii.panel),
             border: Border.all(color: AppPalette.line.withValues(alpha: 0.9)),
           ),
           child: Row(
@@ -75,18 +81,17 @@ final class WorkspaceMetricTile extends StatelessWidget {
     return AnimatedContainer(
       duration: const Duration(milliseconds: 180),
       curve: Curves.easeOutCubic,
-      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.md,
+        vertical: AppSpace.sm,
+      ),
       decoration: BoxDecoration(
-        color: metric.isHighlighted ? AppPalette.surface : Colors.transparent,
-        borderRadius: BorderRadius.circular(20),
-        boxShadow: metric.isHighlighted
-            ? const [
-                BoxShadow(
-                  color: Color(0x140F1913),
-                  blurRadius: 18,
-                  offset: Offset(0, 8),
-                ),
-              ]
+        color: metric.isHighlighted
+            ? AppPalette.surfaceSoft
+            : Colors.transparent,
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        border: metric.isHighlighted
+            ? Border.all(color: AppPalette.line)
             : null,
       ),
       child: isCompact
@@ -154,15 +159,22 @@ final class WorkspaceSectionLead extends StatelessWidget {
         final titleBlock = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(title, style: theme.textTheme.displaySmall),
+            Text(
+              title,
+              style: constraints.maxWidth < 620
+                  ? theme.textTheme.headlineLarge
+                  : theme.textTheme.displaySmall,
+            ),
             const SizedBox(height: AppSpace.xs),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 640),
               child: Text(
                 description,
-                style: theme.textTheme.bodyMedium?.copyWith(
-                  color: AppPalette.inkSoft,
-                ),
+                style:
+                    (constraints.maxWidth < 620
+                            ? theme.textTheme.bodySmall
+                            : theme.textTheme.bodyMedium)
+                        ?.copyWith(color: AppPalette.inkSoft),
               ),
             ),
           ],
@@ -176,9 +188,34 @@ final class WorkspaceSectionLead extends StatelessWidget {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              titleBlock,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: constraints.maxWidth < 620
+                          ? theme.textTheme.headlineLarge
+                          : theme.textTheme.displaySmall,
+                    ),
+                  ),
+                  const SizedBox(width: AppSpace.md),
+                  trailing!,
+                ],
+              ),
+              const SizedBox(height: AppSpace.xs),
+              ConstrainedBox(
+                constraints: const BoxConstraints(maxWidth: 640),
+                child: Text(
+                  description,
+                  style:
+                      (constraints.maxWidth < 620
+                              ? theme.textTheme.bodySmall
+                              : theme.textTheme.bodyMedium)
+                          ?.copyWith(color: AppPalette.inkSoft),
+                ),
+              ),
               const SizedBox(height: AppSpace.md),
-              trailing!,
             ],
           );
         }
@@ -200,8 +237,8 @@ final class WorkspaceSurfaceCard extends StatelessWidget {
   const WorkspaceSurfaceCard({
     required this.child,
     this.accent,
-    this.padding = const EdgeInsets.all(AppSpace.xl),
-    this.radius = 26,
+    this.padding = const EdgeInsets.all(AppSpace.lg),
+    this.radius = 16,
     super.key,
   });
 
@@ -217,20 +254,13 @@ final class WorkspaceSurfaceCard extends StatelessWidget {
         color: AppPalette.surface,
         borderRadius: BorderRadius.circular(radius),
         border: Border.all(color: AppPalette.line),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x120E1712),
-            blurRadius: 26,
-            offset: Offset(0, 12),
-          ),
-        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (accent != null)
             Container(
-              height: 5,
+              height: 4,
               decoration: BoxDecoration(
                 color: accent,
                 borderRadius: BorderRadius.vertical(
@@ -262,10 +292,11 @@ final class WorkspaceTag extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: background,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(AppRadii.chip),
+        border: Border.all(color: AppPalette.line),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
@@ -336,10 +367,10 @@ final class WorkspaceErrorCard extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpace.lg),
+      padding: const EdgeInsets.all(AppSpace.md),
       decoration: BoxDecoration(
         color: const Color(0x1FD6A38B),
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: const Color(0x5ED6A38B)),
       ),
       child: Column(

@@ -181,6 +181,7 @@ final class _CategoriesSectionState extends ConsumerState<CategoriesSection> {
     final categories = ref.watch(
       tournamentCategoriesProvider(widget.tournamentId),
     );
+    final sectionSpacing = widget.embedded ? AppSpace.md : AppSpace.lg;
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -193,7 +194,7 @@ final class _CategoriesSectionState extends ConsumerState<CategoriesSection> {
             child: Text(_isCreating ? 'Creating...' : 'New category'),
           ),
         ),
-        const SizedBox(height: AppSpace.lg),
+        SizedBox(height: sectionSpacing),
         categories.when(
           data: (items) {
             if (items.isEmpty) {
@@ -236,7 +237,7 @@ final class _CategoriesSectionState extends ConsumerState<CategoriesSection> {
                     ),
                   ],
                 ),
-                const SizedBox(height: AppSpace.lg),
+                SizedBox(height: sectionSpacing),
                 WorkspaceSurfaceCard(
                   child: Column(
                     children: [
@@ -488,10 +489,10 @@ final class _CategoriesErrorState extends StatelessWidget {
 String _friendlyError(Object error) {
   final message = error.toString();
   if (message.contains('permission-denied')) {
-    return 'Deploy the Firestore rules for categories, then reload the app.';
+    return 'This organizer account cannot update categories yet. Reload and try again.';
   }
   if (message.contains('failed-precondition')) {
-    return 'Create the Firestore database in Firebase Console first, then reload the app.';
+    return 'Category data is not ready yet in this environment. Try again in a moment.';
   }
   return message;
 }

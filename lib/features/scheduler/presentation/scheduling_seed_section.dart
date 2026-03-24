@@ -89,7 +89,7 @@ final class _SchedulingSeedSectionState
                         : 'Check-in updates need a save',
                     message: editedCount > 0
                         ? 'Your local seed edits are already reflected in the preview below. Save them when the order looks right.'
-                        : 'New check-ins changed the effective order for one or more categories. Save again to keep Firestore in sync.',
+                        : 'New check-ins changed the effective order for one or more categories. Save again to keep the scheduler aligned.',
                     tint: editedCount > 0
                         ? AppPalette.apricotSoft
                         : AppPalette.sageSoft,
@@ -1081,10 +1081,10 @@ bool _sameIds(List<String> left, List<String> right) {
 String _friendlyError(Object error) {
   final message = error.toString();
   if (message.contains('permission-denied')) {
-    return 'Deploy the current Firestore rules, then reload the app.';
+    return 'This organizer account cannot save seed changes yet. Reload and try again.';
   }
   if (message.contains('failed-precondition')) {
-    return 'Create the Firestore database in Firebase Console first, then reload the app.';
+    return 'Seeding data is not ready yet in this environment. Try again in a moment.';
   }
   return message;
 }

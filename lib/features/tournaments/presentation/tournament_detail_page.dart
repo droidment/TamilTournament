@@ -84,42 +84,51 @@ final class _TournamentDetailPageState
 
     return Scaffold(
       body: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(AppSpace.lg),
-          child: tournament.when(
-            data: (value) {
-              if (value == null) {
-                return const _TournamentDetailState(
-                  title: 'Tournament not available',
-                  message:
-                      'This tournament was not found or you do not have access to it.',
-                );
-              }
-              return _TournamentDetailBody(
-                tournament: value,
-                selectedTab: _selectedTab,
-                scrollController: _workspaceScrollController,
-                onSelectTab: (tab) async {
-                  setState(() {
-                    _selectedTab = tab;
-                  });
-                  if (_workspaceScrollController.hasClients &&
-                      _workspaceScrollController.offset > 0) {
-                    await _workspaceScrollController.animateTo(
-                      0,
-                      duration: const Duration(milliseconds: 220),
-                      curve: Curves.easeOutCubic,
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            final pagePadding = constraints.maxWidth < 900
+                ? AppSpace.md
+                : AppSpace.lg;
+
+            return Padding(
+              padding: EdgeInsets.all(pagePadding),
+              child: tournament.when(
+                data: (value) {
+                  if (value == null) {
+                    return const _TournamentDetailState(
+                      title: 'Tournament not available',
+                      message:
+                          'This tournament was not found or you do not have access to it.',
                     );
                   }
+                  return _TournamentDetailBody(
+                    tournament: value,
+                    selectedTab: _selectedTab,
+                    scrollController: _workspaceScrollController,
+                    onSelectTab: (tab) async {
+                      setState(() {
+                        _selectedTab = tab;
+                      });
+                      if (_workspaceScrollController.hasClients &&
+                          _workspaceScrollController.offset > 0) {
+                        await _workspaceScrollController.animateTo(
+                          0,
+                          duration: const Duration(milliseconds: 220),
+                          curve: Curves.easeOutCubic,
+                        );
+                      }
+                    },
+                  );
                 },
-              );
-            },
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => _TournamentDetailState(
-              title: 'Tournament detail',
-              message: error.toString(),
-            ),
-          ),
+                loading: () => const Center(child: CircularProgressIndicator()),
+                error: (error, _) => const _TournamentDetailState(
+                  title: 'Tournament detail',
+                  message:
+                      'We could not load this tournament right now. Please try again.',
+                ),
+              ),
+            );
+          },
         ),
       ),
     );
@@ -167,23 +176,29 @@ final class _TournamentDetailBody extends StatelessWidget {
                   selectedTab: selectedTab,
                   collapseProgress: collapseProgress,
                 ),
-                ClipRect(
-                  child: Align(
-                    heightFactor: 1 - collapseProgress,
-                    alignment: Alignment.topCenter,
-                    child: Opacity(
-                      opacity: 1 - collapseProgress,
-                      child: Padding(
-                        padding: const EdgeInsets.only(top: AppSpace.md),
-                        child: _TournamentHeroCard(
-                          tournament: tournament,
-                          selectedTab: selectedTab,
+                if (isCompact) ...[
+                  const SizedBox(height: AppSpace.sm),
+                  _CompactTournamentSummary(tournament: tournament),
+                  const SizedBox(height: AppSpace.sm),
+                ] else ...[
+                  ClipRect(
+                    child: Align(
+                      heightFactor: 1 - collapseProgress,
+                      alignment: Alignment.topCenter,
+                      child: Opacity(
+                        opacity: 1 - collapseProgress,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: AppSpace.md),
+                          child: _TournamentHeroCard(
+                            tournament: tournament,
+                            selectedTab: selectedTab,
+                          ),
                         ),
                       ),
                     ),
                   ),
-                ),
-                SizedBox(height: _spaceBetween(18, 10, collapseProgress)),
+                  SizedBox(height: _spaceBetween(18, 10, collapseProgress)),
+                ],
                 if (isCompact) ...[
                   Expanded(
                     child: _WorkspaceContent(
@@ -247,38 +262,124 @@ final class _WorkspaceToolbar extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 720;
+
+        return Container(
+          padding: const EdgeInsets.only(bottom: AppSpace.sm),
+          decoration: BoxDecoration(
+            border: Border(
+              bottom: BorderSide(
+                color: AppPalette.line.withValues(alpha: 0.85),
+              ),
+            ),
+          ),
+          child: isCompact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () => context.go('/'),
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      label: const Text('Back'),
+                    ),
+                    const SizedBox(height: AppSpace.sm),
+                    Text(
+                      tournament.name,
+                      style: theme.textTheme.headlineMedium?.copyWith(
+                        fontWeight: FontWeight.w700,
+                        fontSize: _spaceBetween(22, 18, collapseProgress),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpace.xs),
+                    Text(
+                      '${tournament.status.label} / ${selectedTab.label}',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: AppPalette.inkSoft,
+                        fontSize: _spaceBetween(16, 14, collapseProgress),
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    TextButton.icon(
+                      onPressed: () => context.go('/'),
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      label: const Text('Back'),
+                    ),
+                    const SizedBox(width: AppSpace.sm),
+                    Expanded(
+                      child: Text(
+                        tournament.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                          fontSize: _spaceBetween(22, 18, collapseProgress),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppSpace.md),
+                    Text(
+                      '${tournament.status.label} / ${selectedTab.label}',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: AppPalette.inkSoft,
+                        fontSize: _spaceBetween(18, 14, collapseProgress),
+                      ),
+                    ),
+                  ],
+                ),
+        );
+      },
+    );
+  }
+}
+
+final class _CompactTournamentSummary extends StatelessWidget {
+  const _CompactTournamentSummary({required this.tournament});
+
+  final Tournament tournament;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Container(
-      padding: const EdgeInsets.only(bottom: AppSpace.sm),
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.md,
+        vertical: AppSpace.sm,
+      ),
       decoration: BoxDecoration(
-        border: Border(
-          bottom: BorderSide(color: AppPalette.line.withValues(alpha: 0.85)),
-        ),
+        color: AppPalette.surfaceSoft,
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        border: Border.all(color: AppPalette.line),
       ),
       child: Row(
         children: [
-          TextButton.icon(
-            onPressed: () => context.go('/'),
-            icon: const Icon(Icons.arrow_back_rounded),
-            label: const Text('Back'),
+          Container(
+            width: 28,
+            height: 28,
+            decoration: BoxDecoration(
+              color: AppPalette.sage,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Icon(
+              Icons.location_on_outlined,
+              size: 16,
+              color: AppPalette.sageStrong,
+            ),
           ),
           const SizedBox(width: AppSpace.sm),
           Expanded(
             child: Text(
-              tournament.name,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.headlineMedium?.copyWith(
-                fontWeight: FontWeight.w700,
-                fontSize: _spaceBetween(22, 18, collapseProgress),
+              '${tournament.venue} · ${_formatDate(tournament.startDate)}',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppPalette.ink,
+                fontWeight: FontWeight.w600,
               ),
-            ),
-          ),
-          const SizedBox(width: AppSpace.md),
-          Text(
-            '${tournament.status.label} / ${selectedTab.label}',
-            style: theme.textTheme.titleMedium?.copyWith(
-              color: AppPalette.inkSoft,
-              fontSize: _spaceBetween(18, 14, collapseProgress),
             ),
           ),
         ],
@@ -301,21 +402,21 @@ final class _TournamentHeroCard extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpace.xl),
+      padding: const EdgeInsets.all(AppSpace.lg),
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
           colors: [AppPalette.surfaceSoft, Color(0xFFF3F7EC)],
         ),
-        borderRadius: BorderRadius.all(Radius.circular(28)),
+        borderRadius: BorderRadius.all(Radius.circular(18)),
       ),
       child: LayoutBuilder(
         builder: (context, constraints) {
           final meta =
               '${tournament.venue} · ${_formatDate(tournament.startDate)}';
           final titleStyle = theme.textTheme.displayLarge?.copyWith(
-            fontSize: constraints.maxWidth < 700 ? 42 : 56,
+            fontSize: constraints.maxWidth < 700 ? 34 : 50,
             fontWeight: FontWeight.w700,
             height: 1.02,
           );
@@ -343,19 +444,19 @@ final class _TournamentHeroCard extends StatelessWidget {
                     mainAxisSize: MainAxisSize.min,
                     children: [
                       Container(
-                        width: 44,
-                        height: 44,
-                        decoration: const BoxDecoration(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
                           color: AppPalette.sage,
-                          shape: BoxShape.circle,
+                          borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Icon(
                           Icons.location_on_outlined,
                           color: AppPalette.sageStrong,
-                          size: 22,
+                          size: 18,
                         ),
                       ),
-                      const SizedBox(width: 12),
+                      const SizedBox(width: AppSpace.sm),
                       Text(
                         meta,
                         style: theme.textTheme.titleLarge?.copyWith(
@@ -394,30 +495,26 @@ final class _BottomWorkspaceNavigation extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(8),
+      padding: const EdgeInsets.all(AppSpace.xs),
       decoration: BoxDecoration(
         color: AppPalette.surface,
-        borderRadius: BorderRadius.circular(28),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: AppPalette.line),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x100F1913),
-            blurRadius: 22,
-            offset: Offset(0, 10),
-          ),
-        ],
       ),
-      child: Row(
-        children: [
-          for (final tab in tabs)
-            Expanded(
-              child: _BottomNavItem(
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (final tab in tabs) ...[
+              _BottomNavItem(
                 tab: tab,
                 isSelected: tab == selectedTab,
                 onTap: () => onSelectTab(tab),
               ),
-            ),
-        ],
+              if (tab != tabs.last) const SizedBox(width: AppSpace.xs),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -440,7 +537,7 @@ final class _WorkspaceSidebar extends StatelessWidget {
   Widget build(BuildContext context) {
     return WorkspaceSurfaceCard(
       padding: const EdgeInsets.all(AppSpace.lg),
-      radius: 24,
+      radius: 14,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -487,18 +584,18 @@ final class _WorkspaceNavTile extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.control),
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpace.md,
-            vertical: 14,
+            vertical: AppSpace.sm,
           ),
           decoration: BoxDecoration(
             color: isSelected ? AppPalette.surfaceSoft : Colors.transparent,
-            borderRadius: BorderRadius.circular(16),
+            borderRadius: BorderRadius.circular(AppRadii.control),
           ),
           child: Row(
             children: [
@@ -507,7 +604,7 @@ final class _WorkspaceNavTile extends StatelessWidget {
                 height: 28,
                 decoration: BoxDecoration(
                   color: isSelected ? tab.accent : Colors.transparent,
-                  borderRadius: BorderRadius.circular(999),
+                  borderRadius: BorderRadius.circular(AppRadii.chip),
                 ),
               ),
               const SizedBox(width: 12),
@@ -566,7 +663,7 @@ final class _WorkspaceContent extends StatelessWidget {
     return SingleChildScrollView(
       key: ValueKey(tab),
       controller: scrollController,
-      padding: const EdgeInsets.only(top: AppSpace.sm, bottom: AppSpace.xl),
+      padding: const EdgeInsets.only(top: AppSpace.xs, bottom: AppSpace.lg),
       child: Align(
         alignment: Alignment.topLeft,
         child: ConstrainedBox(
@@ -627,14 +724,18 @@ final class _BottomNavItem extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(AppRadii.control),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 180),
         curve: Curves.easeOutCubic,
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
+        width: 84,
+        padding: const EdgeInsets.symmetric(
+          vertical: AppSpace.sm,
+          horizontal: AppSpace.sm,
+        ),
         decoration: BoxDecoration(
-          color: isSelected ? AppPalette.sage : Colors.transparent,
-          borderRadius: BorderRadius.circular(20),
+          color: isSelected ? AppPalette.sageSoft : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppRadii.control),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,

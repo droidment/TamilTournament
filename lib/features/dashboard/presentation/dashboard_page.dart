@@ -23,7 +23,7 @@ final class DashboardPage extends ConsumerWidget {
             final isCompact = constraints.maxWidth < 900;
 
             return Padding(
-              padding: EdgeInsets.all(isCompact ? AppSpace.md : AppSpace.lg),
+              padding: EdgeInsets.all(isCompact ? AppSpace.sm : AppSpace.lg),
               child: isCompact
                   ? ListView(
                       children: [
@@ -112,7 +112,7 @@ final class _Header extends StatelessWidget {
     final nextTournament = tournaments.isEmpty ? null : tournaments.first;
 
     return Container(
-      padding: EdgeInsets.all(isCompact ? AppSpace.lg : AppSpace.xl),
+      padding: EdgeInsets.all(isCompact ? AppSpace.md : AppSpace.lg),
       decoration: BoxDecoration(
         color: AppPalette.surface,
         borderRadius: BorderRadius.circular(AppRadii.panel),
@@ -130,7 +130,7 @@ final class _Header extends StatelessWidget {
           const SizedBox(height: AppSpace.sm),
           Text(
             nextTournament == null
-                ? 'Signed in as $displayName. Create a tournament to start wiring categories, entries, and scheduling against Firestore.'
+                ? 'Signed in as $displayName. Create a tournament to start planning categories, entries, and match flow.'
                 : 'Signed in as $displayName. Your latest tournament is ${nextTournament.name} at ${nextTournament.venue} on ${_formatDate(nextTournament.startDate)}.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: AppPalette.inkSoft,
@@ -258,10 +258,10 @@ final class _MetricCard extends StatelessWidget {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(AppSpace.lg),
+      padding: const EdgeInsets.all(AppSpace.md),
       decoration: BoxDecoration(
         color: AppPalette.surface,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: AppPalette.line),
         gradient: LinearGradient(
           colors: [wash, Colors.transparent],
@@ -324,7 +324,7 @@ final class _RecentTournamentsPanel extends StatelessWidget {
           Text('Recent tournaments', style: theme.textTheme.headlineMedium),
           const SizedBox(height: AppSpace.xs),
           Text(
-            'Your recent Firestore-backed tournaments, ready to open and continue.',
+            'Your recent tournaments, ready to open and continue.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: AppPalette.inkSoft,
             ),
@@ -379,12 +379,12 @@ final class _RecentTournamentCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(16),
         onTap: () => context.go('/tournaments/${tournament.id}'),
         child: Container(
           decoration: BoxDecoration(
-            color: AppPalette.surfaceSoft,
-            borderRadius: BorderRadius.circular(24),
+            color: AppPalette.surface,
+            borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppPalette.line),
           ),
           child: Column(
@@ -394,7 +394,7 @@ final class _RecentTournamentCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: accent,
                   borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(24),
+                    top: Radius.circular(16),
                   ),
                 ),
               ),
@@ -469,7 +469,7 @@ final class _EmptyRecentTournaments extends StatelessWidget {
           Text('No tournaments yet', style: theme.textTheme.titleLarge),
           const SizedBox(height: AppSpace.sm),
           Text(
-            'Use the workspace below to create your first Firestore-backed tournament.',
+            'Use the workspace below to create your first tournament and start organizing the day.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: AppPalette.inkSoft,
             ),
@@ -503,12 +503,12 @@ final class _FirebaseNotice extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Firebase not configured yet',
+                'Workspace setup incomplete',
                 style: theme.textTheme.titleLarge,
               ),
               const SizedBox(height: AppSpace.sm),
               Text(
-                'Choose the Firebase project for this app, then run flutterfire configure for web to generate the web Firebase options file.',
+                'Tournament services are not ready in this environment yet. Open the live organizer site or finish setup before continuing.',
                 style: theme.textTheme.bodyMedium?.copyWith(
                   color: AppPalette.inkSoft,
                 ),
@@ -534,7 +534,7 @@ final class _Sidebar extends StatelessWidget {
     final displayName = (user?.displayName?.trim().isNotEmpty ?? false)
         ? user!.displayName!.trim()
         : user?.email ?? 'Organizer';
-    final email = user?.email ?? 'Signed in with Google';
+    final email = user?.email ?? 'Organizer account';
     final initials = _userInitials(displayName);
     final items = tournaments.maybeWhen(
       data: (value) => value,
@@ -542,18 +542,11 @@ final class _Sidebar extends StatelessWidget {
     );
 
     return Container(
-      padding: EdgeInsets.all(isCompact ? AppSpace.lg : AppSpace.lg),
+      padding: const EdgeInsets.all(AppSpace.md),
       decoration: BoxDecoration(
         color: AppPalette.surface,
         borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: AppPalette.line),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x12443828),
-            blurRadius: 50,
-            offset: Offset(0, 18),
-          ),
-        ],
       ),
       child: Column(
         mainAxisSize: isCompact ? MainAxisSize.min : MainAxisSize.max,
@@ -562,11 +555,11 @@ final class _Sidebar extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 48,
-                height: 48,
+                width: 44,
+                height: 44,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
+                  borderRadius: BorderRadius.circular(AppRadii.control),
                   gradient: const LinearGradient(
                     colors: [AppPalette.sage, AppPalette.surfaceSoft],
                     begin: Alignment.topLeft,
@@ -585,7 +578,7 @@ final class _Sidebar extends StatelessWidget {
                       style: theme.textTheme.titleMedium,
                     ),
                     Text(
-                      'Firestore workspace',
+                      'Organizer console',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: AppPalette.inkMuted,
                       ),
@@ -636,7 +629,7 @@ final class _Sidebar extends StatelessWidget {
             padding: const EdgeInsets.all(AppSpace.md),
             decoration: BoxDecoration(
               color: AppPalette.surfaceSoft,
-              borderRadius: BorderRadius.circular(22),
+              borderRadius: BorderRadius.circular(AppRadii.panel),
               border: Border.all(color: AppPalette.line),
             ),
             child: Column(
@@ -682,10 +675,10 @@ final class _SidebarStat extends StatelessWidget {
       constraints: const BoxConstraints(minWidth: 120),
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpace.md,
-        vertical: 14,
+        vertical: AppSpace.sm,
       ),
       decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         color: AppPalette.surfaceSoft,
         border: Border.all(color: AppPalette.line),
       ),
@@ -727,7 +720,7 @@ final class _HeaderChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: tint,
         borderRadius: BorderRadius.circular(AppRadii.chip),
@@ -753,17 +746,17 @@ final class _DataErrorState extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpace.lg),
+      padding: const EdgeInsets.all(AppSpace.md),
       decoration: BoxDecoration(
         color: const Color(0x24C97D6B),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: const Color(0x47C97D6B)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Firestore needs attention',
+            'Workspace needs attention',
             style: theme.textTheme.titleLarge?.copyWith(
               color: const Color(0xFF7B4D42),
             ),
@@ -784,12 +777,12 @@ final class _DataErrorState extends StatelessWidget {
 String _friendlyError(Object error) {
   final message = error.toString();
   if (message.contains('permission-denied')) {
-    return 'Deploy the Firestore rules in this repo, then reload the app.';
+    return 'This organizer account does not have access to tournament data yet. Reload and try again.';
   }
   if (message.contains('failed-precondition')) {
-    return 'Create the Firestore database in Firebase Console first, then reload the app.';
+    return 'Tournament data is not ready yet in this environment. Try again in a moment.';
   }
-  return message;
+  return 'We could not load the organizer workspace right now. Please try again.';
 }
 
 int _statusCount(List<Tournament> tournaments, TournamentStatus status) {

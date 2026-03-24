@@ -154,16 +154,28 @@ final class _CategoryScheduleCard extends StatelessWidget {
                 title: category.groups.length > 1 ? 'Groups' : 'Seed order',
               ),
               const SizedBox(height: AppSpace.sm),
-              Wrap(
-                spacing: AppSpace.md,
-                runSpacing: AppSpace.md,
-                children: [
-                  for (final group in category.groups)
-                    _GroupCard(
-                      group: group,
-                      isMultiGroup: category.groups.length > 1,
-                    ),
-                ],
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final useSingleColumn = constraints.maxWidth < 720;
+                  final cardWidth = useSingleColumn
+                      ? constraints.maxWidth
+                      : 260.0;
+
+                  return Wrap(
+                    spacing: AppSpace.md,
+                    runSpacing: AppSpace.md,
+                    children: [
+                      for (final group in category.groups)
+                        SizedBox(
+                          width: cardWidth,
+                          child: _GroupCard(
+                            group: group,
+                            isMultiGroup: category.groups.length > 1,
+                          ),
+                        ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: AppSpace.lg),
               _SectionHeader(title: 'Round schedule'),
@@ -185,13 +197,25 @@ final class _CategoryScheduleCard extends StatelessWidget {
                 const SizedBox(height: AppSpace.lg),
                 const _SectionHeader(title: 'Qualification path'),
                 const SizedBox(height: AppSpace.sm),
-                Wrap(
-                  spacing: AppSpace.md,
-                  runSpacing: AppSpace.md,
-                  children: [
-                    for (final match in category.qualificationMatches)
-                      _QualificationCard(match: match),
-                  ],
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final useSingleColumn = constraints.maxWidth < 720;
+                    final cardWidth = useSingleColumn
+                        ? constraints.maxWidth
+                        : 220.0;
+
+                    return Wrap(
+                      spacing: AppSpace.md,
+                      runSpacing: AppSpace.md,
+                      children: [
+                        for (final match in category.qualificationMatches)
+                          SizedBox(
+                            width: cardWidth,
+                            child: _QualificationCard(match: match),
+                          ),
+                      ],
+                    );
+                  },
                 ),
               ],
             ],
@@ -212,11 +236,10 @@ final class _GroupCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      width: 280,
       padding: const EdgeInsets.all(AppSpace.md),
       decoration: BoxDecoration(
         color: AppPalette.surfaceSoft,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: AppPalette.line),
       ),
       child: Column(
@@ -270,7 +293,7 @@ final class _RoundCard extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpace.md),
       decoration: BoxDecoration(
         color: AppPalette.surfaceSoft,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: AppPalette.line),
       ),
       child: Column(
@@ -301,7 +324,7 @@ final class _MatchRow extends StatelessWidget {
       padding: const EdgeInsets.all(AppSpace.md),
       decoration: BoxDecoration(
         color: AppPalette.surfaceSoft,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(AppRadii.control),
         border: Border.all(color: AppPalette.line),
       ),
       child: Row(
@@ -345,11 +368,10 @@ final class _QualificationCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      width: 240,
       padding: const EdgeInsets.all(AppSpace.md),
       decoration: BoxDecoration(
         color: AppPalette.surfaceSoft,
-        borderRadius: BorderRadius.circular(18),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: AppPalette.line),
       ),
       child: Column(

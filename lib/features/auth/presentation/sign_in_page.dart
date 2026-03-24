@@ -23,7 +23,9 @@ class _SignInPageState extends State<SignInPage> {
 
     try {
       if (!kIsWeb) {
-        throw UnsupportedError('Google popup sign-in is configured for web.');
+        throw UnsupportedError(
+          'This sign-in flow is available in the web app.',
+        );
       }
 
       final provider = GoogleAuthProvider()
@@ -32,7 +34,7 @@ class _SignInPageState extends State<SignInPage> {
       await FirebaseAuth.instance.signInWithPopup(provider);
     } on FirebaseAuthException catch (error) {
       setState(() {
-        _errorMessage = error.message ?? 'Google sign-in failed.';
+        _errorMessage = _friendlyAuthError(error);
       });
     } catch (error) {
       setState(() {
@@ -60,148 +62,186 @@ class _SignInPageState extends State<SignInPage> {
             end: Alignment.bottomCenter,
           ),
         ),
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 1100),
-            child: Padding(
-              padding: const EdgeInsets.all(AppSpace.xl),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: AppSpace.xxl),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Run the tournament from one screen, not five spreadsheets.',
-                            style: theme.textTheme.displayLarge,
-                          ),
-                          const SizedBox(height: AppSpace.lg),
-                          Text(
-                            'Google sign-in is the first gate for the web MVP. After auth, the app will move into tournament setup, entries, scheduling, and score approval.',
-                            style: theme.textTheme.bodyLarge?.copyWith(
-                              color: AppPalette.inkSoft,
-                            ),
-                          ),
-                          const SizedBox(height: AppSpace.xl),
-                          Wrap(
-                            spacing: AppSpace.sm,
-                            runSpacing: AppSpace.sm,
-                            children: const [
-                              _InfoChip(
-                                label: 'Google Auth',
-                                tint: AppPalette.sageSoft,
-                                textColor: AppPalette.ink,
-                              ),
-                              _InfoChip(
-                                label: 'Firestore',
-                                tint: AppPalette.skySoft,
-                                textColor: Color(0xFF456F77),
-                              ),
-                              _InfoChip(
-                                label: 'Storage',
-                                tint: AppPalette.apricotSoft,
-                                textColor: Color(0xFF8F6038),
-                              ),
-                              _InfoChip(
-                                label: 'Hosting',
-                                tint: AppPalette.oliveSoft,
-                                textColor: Color(0xFF5F7243),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                    ),
+        child: SafeArea(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 860;
+
+              return Align(
+                alignment: Alignment.topCenter,
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.all(
+                    isCompact ? AppSpace.md : AppSpace.xl,
                   ),
-                  Expanded(
-                    child: Container(
-                      padding: const EdgeInsets.all(AppSpace.xl),
-                      decoration: BoxDecoration(
-                        color: AppPalette.surface,
-                        borderRadius: BorderRadius.circular(AppRadii.panel),
-                        border: Border.all(color: AppPalette.line),
-                        boxShadow: const [
-                          BoxShadow(
-                            color: Color(0x12443828),
-                            blurRadius: 50,
-                            offset: Offset(0, 18),
-                          ),
-                        ],
-                      ),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Sign in to continue',
-                            style: theme.textTheme.headlineMedium,
-                          ),
-                          const SizedBox(height: AppSpace.sm),
-                          Text(
-                            'Use your Google account to access the organizer workspace.',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: AppPalette.inkSoft,
+                  child: ConstrainedBox(
+                    constraints: BoxConstraints(
+                      maxWidth: isCompact ? 520 : 1020,
+                    ),
+                    child: Flex(
+                      direction: isCompact ? Axis.vertical : Axis.horizontal,
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Flexible(
+                          child: Padding(
+                            padding: EdgeInsets.only(
+                              right: isCompact ? 0 : AppSpace.xl,
+                              bottom: isCompact ? AppSpace.lg : 0,
+                            ),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Run the tournament from one screen, not five spreadsheets.',
+                                  style:
+                                      (isCompact
+                                              ? theme.textTheme.headlineLarge
+                                              : theme.textTheme.displayLarge)
+                                          ?.copyWith(
+                                            fontWeight: FontWeight.w700,
+                                          ),
+                                ),
+                                const SizedBox(height: AppSpace.md),
+                                ConstrainedBox(
+                                  constraints: const BoxConstraints(
+                                    maxWidth: 560,
+                                  ),
+                                  child: Text(
+                                    'Set up categories, check in pairs, manage courts, and keep the tournament moving from one workspace.',
+                                    style: theme.textTheme.bodyLarge?.copyWith(
+                                      color: AppPalette.inkSoft,
+                                    ),
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpace.lg),
+                                Wrap(
+                                  spacing: AppSpace.sm,
+                                  runSpacing: AppSpace.sm,
+                                  children: const [
+                                    _InfoChip(
+                                      label: 'Check-in',
+                                      tint: AppPalette.sageSoft,
+                                      textColor: AppPalette.ink,
+                                    ),
+                                    _InfoChip(
+                                      label: 'Categories',
+                                      tint: AppPalette.skySoft,
+                                      textColor: Color(0xFF456F77),
+                                    ),
+                                    _InfoChip(
+                                      label: 'Courts',
+                                      tint: AppPalette.apricotSoft,
+                                      textColor: Color(0xFF8F6038),
+                                    ),
+                                    _InfoChip(
+                                      label: 'Scores',
+                                      tint: AppPalette.oliveSoft,
+                                      textColor: Color(0xFF5F7243),
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
                           ),
-                          const SizedBox(height: AppSpace.xl),
-                          SizedBox(
+                        ),
+                        Flexible(
+                          child: Container(
                             width: double.infinity,
-                            child: FilledButton(
-                              onPressed: _isLoading ? null : _signInWithGoogle,
-                              child: Padding(
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: AppSpace.sm,
-                                ),
-                                child: Text(
-                                  _isLoading
-                                      ? 'Opening Google...'
-                                      : 'Continue with Google',
-                                ),
+                            padding: const EdgeInsets.all(AppSpace.lg),
+                            decoration: BoxDecoration(
+                              color: AppPalette.surface,
+                              borderRadius: BorderRadius.circular(
+                                AppRadii.panel,
                               ),
+                              border: Border.all(color: AppPalette.line),
+                            ),
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  'Open the organizer workspace',
+                                  style: theme.textTheme.headlineMedium,
+                                ),
+                                const SizedBox(height: AppSpace.xs),
+                                Text(
+                                  'Sign in with the organizer account for this event and continue where setup left off.',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: AppPalette.inkSoft,
+                                  ),
+                                ),
+                                const SizedBox(height: AppSpace.lg),
+                                SizedBox(
+                                  width: double.infinity,
+                                  child: FilledButton(
+                                    onPressed: _isLoading
+                                        ? null
+                                        : _signInWithGoogle,
+                                    child: Text(
+                                      _isLoading
+                                          ? 'Opening sign-in...'
+                                          : 'Enter workspace',
+                                    ),
+                                  ),
+                                ),
+                                if (_errorMessage != null) ...[
+                                  const SizedBox(height: AppSpace.md),
+                                  Container(
+                                    width: double.infinity,
+                                    padding: const EdgeInsets.all(AppSpace.md),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0x24C97D6B),
+                                      borderRadius: BorderRadius.circular(
+                                        AppRadii.panel,
+                                      ),
+                                      border: Border.all(
+                                        color: const Color(0x47C97D6B),
+                                      ),
+                                    ),
+                                    child: Text(
+                                      _errorMessage!,
+                                      style: theme.textTheme.bodyMedium
+                                          ?.copyWith(
+                                            color: const Color(0xFF7B4D42),
+                                          ),
+                                    ),
+                                  ),
+                                ],
+                                const SizedBox(height: AppSpace.lg),
+                                Text(
+                                  'Use the published organizer site when staff are signing in during live operation.',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: AppPalette.inkMuted,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
-                          if (_errorMessage != null) ...[
-                            const SizedBox(height: AppSpace.md),
-                            Container(
-                              width: double.infinity,
-                              padding: const EdgeInsets.all(AppSpace.md),
-                              decoration: BoxDecoration(
-                                color: const Color(0x24C97D6B),
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(
-                                  color: const Color(0x47C97D6B),
-                                ),
-                              ),
-                              child: Text(
-                                _errorMessage!,
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: const Color(0xFF7B4D42),
-                                ),
-                              ),
-                            ),
-                          ],
-                          const SizedBox(height: AppSpace.xl),
-                          Text(
-                            'Before sign-in works in the browser, make sure Google is enabled in Firebase Authentication and localhost is listed as an authorized domain.',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: AppPalette.inkMuted,
-                            ),
-                          ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
-            ),
+                ),
+              );
+            },
           ),
         ),
       ),
     );
   }
+}
+
+String _friendlyAuthError(FirebaseAuthException error) {
+  final message = error.message ?? error.code;
+  if (message.contains('authorized') || message.contains('OAuth')) {
+    return 'This workspace is not ready for sign-in from this address yet. Open the organizer site from its approved web address and try again.';
+  }
+  if (error.code == 'popup-blocked') {
+    return 'Sign-in was blocked by the browser. Allow the sign-in window and try again.';
+  }
+  if (error.code == 'popup-closed-by-user') {
+    return 'Sign-in was closed before it finished. Try again when you are ready.';
+  }
+  return 'We could not open the organizer workspace right now. Please try again.';
 }
 
 final class _InfoChip extends StatelessWidget {
@@ -219,10 +259,11 @@ final class _InfoChip extends StatelessWidget {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: tint,
-        borderRadius: BorderRadius.circular(999),
+        borderRadius: BorderRadius.circular(AppRadii.chip),
+        border: Border.all(color: AppPalette.line),
       ),
       child: Text(
         label,

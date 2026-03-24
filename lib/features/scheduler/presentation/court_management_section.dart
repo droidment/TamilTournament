@@ -307,18 +307,30 @@ class _CourtManagementSectionState
             if (items.isEmpty) {
               return const _CourtEmptyState();
             }
-            return Wrap(
-              spacing: AppSpace.md,
-              runSpacing: AppSpace.md,
-              children: [
-                for (final court in items)
-                  _CourtCard(
-                    court: court,
-                    isBusy: _busyCourtIds.contains(court.id),
-                    onToggleAvailability: () => _toggleCourt(court),
-                    onEditDetails: () => _editCourtDetails(court),
-                  ),
-              ],
+            return LayoutBuilder(
+              builder: (context, constraints) {
+                final useSingleColumn = constraints.maxWidth < 720;
+                final cardWidth = useSingleColumn
+                    ? constraints.maxWidth
+                    : 240.0;
+
+                return Wrap(
+                  spacing: AppSpace.md,
+                  runSpacing: AppSpace.md,
+                  children: [
+                    for (final court in items)
+                      SizedBox(
+                        width: cardWidth,
+                        child: _CourtCard(
+                          court: court,
+                          isBusy: _busyCourtIds.contains(court.id),
+                          onToggleAvailability: () => _toggleCourt(court),
+                          onEditDetails: () => _editCourtDetails(court),
+                        ),
+                      ),
+                  ],
+                );
+              },
             );
           },
           loading: () => const Center(
@@ -363,36 +375,47 @@ final class _CourtSetupBar extends StatelessWidget {
   Widget build(BuildContext context) {
     return WorkspaceSurfaceCard(
       padding: const EdgeInsets.all(AppSpace.lg),
-      child: Wrap(
-        spacing: AppSpace.md,
-        runSpacing: AppSpace.md,
-        crossAxisAlignment: WrapCrossAlignment.center,
-        children: [
-          SizedBox(
-            width: 180,
-            child: TextField(
-              controller: controller,
-              keyboardType: TextInputType.number,
-              decoration: const InputDecoration(
-                labelText: 'Court count',
-                hintText: '10',
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final isCompact = constraints.maxWidth < 680;
+
+          return Wrap(
+            spacing: AppSpace.md,
+            runSpacing: AppSpace.md,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              SizedBox(
+                width: isCompact ? constraints.maxWidth : 180,
+                child: TextField(
+                  controller: controller,
+                  keyboardType: TextInputType.number,
+                  decoration: const InputDecoration(
+                    labelText: 'Court count',
+                    hintText: '10',
+                  ),
+                ),
               ),
-            ),
-          ),
-          FilledButton(
-            onPressed: isGenerating ? null : onGenerate,
-            child: Text(isGenerating ? 'Saving...' : 'Generate courts'),
-          ),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: Text(
-              'Generating keeps C1..Cn, preserves edited names and notes, and trims only courts above the new limit.',
-              style: Theme.of(
-                context,
-              ).textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
-            ),
-          ),
-        ],
+              SizedBox(
+                width: isCompact ? constraints.maxWidth : null,
+                child: FilledButton(
+                  onPressed: isGenerating ? null : onGenerate,
+                  child: Text(isGenerating ? 'Saving...' : 'Generate courts'),
+                ),
+              ),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxWidth: isCompact ? constraints.maxWidth : 420,
+                ),
+                child: Text(
+                  'Generating keeps C1..Cn, preserves edited names and notes, and trims only courts above the new limit.',
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -418,65 +441,60 @@ final class _CourtCard extends StatelessWidget {
         ? AppPalette.sageStrong
         : AppPalette.apricot;
 
-    return SizedBox(
-      width: 260,
-      child: WorkspaceSurfaceCard(
-        accent: accent,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(court.name, style: theme.textTheme.titleLarge),
-            const SizedBox(height: AppSpace.xs),
-            Text(
-              court.code,
-              style: AppTheme.numeric(
-                theme.textTheme.bodySmall,
-              ).copyWith(color: AppPalette.inkSoft),
+    return WorkspaceSurfaceCard(
+      accent: accent,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(court.name, style: theme.textTheme.titleLarge),
+          const SizedBox(height: AppSpace.xs),
+          Text(
+            court.code,
+            style: AppTheme.numeric(
+              theme.textTheme.bodySmall,
+            ).copyWith(color: AppPalette.inkSoft),
+          ),
+          const SizedBox(height: AppSpace.md),
+          WorkspaceTag(
+            label: court.status.label,
+            background: court.isAvailable
+                ? AppPalette.sageSoft
+                : AppPalette.apricotSoft,
+            foreground: court.isAvailable
+                ? const Color(0xFF365141)
+                : const Color(0xFF8F6038),
+          ),
+          const SizedBox(height: AppSpace.md),
+          Text(
+            court.note.trim().isEmpty ? 'No operational note yet.' : court.note,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: court.note.trim().isEmpty
+                  ? AppPalette.inkMuted
+                  : AppPalette.inkSoft,
             ),
-            const SizedBox(height: AppSpace.md),
-            WorkspaceTag(
-              label: court.status.label,
-              background: court.isAvailable
-                  ? AppPalette.sageSoft
-                  : AppPalette.apricotSoft,
-              foreground: court.isAvailable
-                  ? const Color(0xFF365141)
-                  : const Color(0xFF8F6038),
-            ),
-            const SizedBox(height: AppSpace.md),
-            Text(
-              court.note.trim().isEmpty
-                  ? 'No operational note yet.'
-                  : court.note,
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: court.note.trim().isEmpty
-                    ? AppPalette.inkMuted
-                    : AppPalette.inkSoft,
+          ),
+          const SizedBox(height: AppSpace.md),
+          Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            children: [
+              OutlinedButton(
+                onPressed: isBusy ? null : onEditDetails,
+                child: const Text('Edit court'),
               ),
-            ),
-            const SizedBox(height: AppSpace.md),
-            Wrap(
-              spacing: AppSpace.sm,
-              runSpacing: AppSpace.sm,
-              children: [
-                OutlinedButton(
-                  onPressed: isBusy ? null : onEditDetails,
-                  child: const Text('Edit court'),
+              FilledButton(
+                onPressed: isBusy ? null : onToggleAvailability,
+                child: Text(
+                  isBusy
+                      ? 'Updating...'
+                      : court.isAvailable
+                      ? 'Pause court'
+                      : 'Restore court',
                 ),
-                FilledButton(
-                  onPressed: isBusy ? null : onToggleAvailability,
-                  child: Text(
-                    isBusy
-                        ? 'Updating...'
-                        : court.isAvailable
-                        ? 'Pause court'
-                        : 'Restore court',
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }
@@ -509,10 +527,10 @@ final class _CourtErrorState extends StatelessWidget {
 String _friendlyError(Object error) {
   final message = error.toString();
   if (message.contains('permission-denied')) {
-    return 'Deploy the updated Firestore rules, then reload the app.';
+    return 'This organizer account cannot update court availability yet. Reload and try again.';
   }
   if (message.contains('failed-precondition')) {
-    return 'Create the Firestore database in Firebase Console first, then reload the app.';
+    return 'Court data is not ready yet in this environment. Try again in a moment.';
   }
   return message;
 }

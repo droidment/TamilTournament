@@ -69,8 +69,8 @@ final class AppTheme {
         filled: true,
         fillColor: AppPalette.surface,
         contentPadding: const EdgeInsets.symmetric(
-          horizontal: AppSpace.lg,
-          vertical: AppSpace.md,
+          horizontal: AppSpace.md,
+          vertical: AppSpace.sm,
         ),
         hintStyle: textTheme.bodyMedium?.copyWith(color: AppPalette.inkMuted),
         labelStyle: textTheme.labelMedium?.copyWith(color: AppPalette.inkSoft),
@@ -90,8 +90,8 @@ final class AppTheme {
           disabledBackgroundColor: AppPalette.lineStrong,
           disabledForegroundColor: AppPalette.inkMuted,
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpace.xl,
-            vertical: AppSpace.md,
+            horizontal: AppSpace.lg,
+            vertical: AppSpace.sm,
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadii.control),
@@ -104,8 +104,8 @@ final class AppTheme {
           backgroundColor: AppPalette.sageStrong,
           foregroundColor: AppPalette.surface,
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpace.xl,
-            vertical: AppSpace.md,
+            horizontal: AppSpace.lg,
+            vertical: AppSpace.sm,
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadii.control),
@@ -118,8 +118,8 @@ final class AppTheme {
           foregroundColor: AppPalette.ink,
           side: const BorderSide(color: AppPalette.lineStrong),
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpace.xl,
-            vertical: AppSpace.md,
+            horizontal: AppSpace.lg,
+            vertical: AppSpace.sm,
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadii.control),
@@ -134,8 +134,8 @@ final class AppTheme {
             borderRadius: BorderRadius.circular(AppRadii.control),
           ),
           padding: const EdgeInsets.symmetric(
-            horizontal: AppSpace.md,
-            vertical: AppSpace.sm,
+            horizontal: AppSpace.sm,
+            vertical: AppSpace.xs,
           ),
           textStyle: textTheme.labelLarge,
         ),
@@ -152,7 +152,7 @@ final class AppTheme {
         secondaryLabelStyle: (textTheme.labelMedium ?? const TextStyle())
             .copyWith(color: AppPalette.ink),
         padding: const EdgeInsets.symmetric(
-          horizontal: AppSpace.md,
+          horizontal: AppSpace.sm,
           vertical: AppSpace.xs,
         ),
       ),
@@ -161,7 +161,7 @@ final class AppTheme {
         backgroundColor: AppPalette.inkSoft,
         contentTextStyle: textTheme.bodyMedium?.copyWith(color: Colors.white),
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(AppRadii.panel),
+          borderRadius: BorderRadius.circular(AppRadii.control),
         ),
       ),
       listTileTheme: ListTileThemeData(
@@ -295,17 +295,17 @@ final class AppPalette {
 }
 
 final class AppSpace {
-  static const double xs = 6;
-  static const double sm = 10;
-  static const double md = 16;
-  static const double lg = 20;
-  static const double xl = 28;
-  static const double xxl = 36;
+  static const double xs = 4;
+  static const double sm = 8;
+  static const double md = 12;
+  static const double lg = 16;
+  static const double xl = 20;
+  static const double xxl = 24;
 }
 
 final class AppRadii {
-  static const double field = 16;
-  static const double control = 14;
-  static const double chip = 12;
-  static const double panel = 22;
+  static const double field = 10;
+  static const double control = 10;
+  static const double chip = 8;
+  static const double panel = 14;
 }

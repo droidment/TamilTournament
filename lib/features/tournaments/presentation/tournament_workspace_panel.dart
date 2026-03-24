@@ -74,7 +74,7 @@ class _TournamentWorkspacePanelState
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(AppSpace.lg),
+      padding: const EdgeInsets.all(AppSpace.md),
       decoration: BoxDecoration(
         color: AppPalette.surface,
         borderRadius: BorderRadius.circular(AppRadii.panel),
@@ -83,31 +83,68 @@ class _TournamentWorkspacePanelState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Tournament workspace',
-                      style: theme.textTheme.headlineMedium,
-                    ),
-                    const SizedBox(height: AppSpace.xs),
-                    Text(
-                      'This is the first Firestore-backed slice: create and track organizer-owned tournament drafts.',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        color: AppPalette.inkSoft,
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 720;
+
+              return Flex(
+                direction: isCompact ? Axis.vertical : Axis.horizontal,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (isCompact)
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Tournament workspace',
+                          style: theme.textTheme.headlineMedium,
+                        ),
+                        const SizedBox(height: AppSpace.xs),
+                        Text(
+                          'Create a tournament, set the venue, and start building the event workspace.',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: AppPalette.inkSoft,
+                          ),
+                        ),
+                      ],
+                    )
+                  else
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Tournament workspace',
+                            style: theme.textTheme.headlineMedium,
+                          ),
+                          const SizedBox(height: AppSpace.xs),
+                          Text(
+                            'Create a tournament, set the venue, and start building the event workspace.',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppPalette.inkSoft,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  ],
-                ),
-              ),
-              FilledButton(
-                onPressed: _isCreating ? null : _showCreateTournamentDialog,
-                child: Text(_isCreating ? 'Creating...' : 'New tournament'),
-              ),
-            ],
+                  if (isCompact)
+                    const SizedBox(height: AppSpace.md)
+                  else
+                    const SizedBox(width: AppSpace.md),
+                  SizedBox(
+                    width: isCompact ? double.infinity : null,
+                    child: FilledButton(
+                      onPressed: _isCreating
+                          ? null
+                          : _showCreateTournamentDialog,
+                      child: Text(
+                        _isCreating ? 'Creating...' : 'New tournament',
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
           ),
           const SizedBox(height: AppSpace.lg),
           tournaments.when(
@@ -300,12 +337,12 @@ final class _TournamentRowCard extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         onTap: () => context.go('/tournaments/${tournament.id}'),
         child: Container(
           decoration: BoxDecoration(
-            color: AppPalette.surfaceSoft,
-            borderRadius: BorderRadius.circular(24),
+            color: AppPalette.surface,
+            borderRadius: BorderRadius.circular(AppRadii.panel),
             border: Border.all(color: AppPalette.line),
           ),
           child: Column(
@@ -315,7 +352,7 @@ final class _TournamentRowCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: accent,
                   borderRadius: const BorderRadius.vertical(
-                    top: Radius.circular(24),
+                    top: Radius.circular(AppRadii.panel),
                   ),
                 ),
               ),
@@ -405,7 +442,7 @@ final class _WorkspaceChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
       decoration: BoxDecoration(
         color: tint,
         borderRadius: BorderRadius.circular(AppRadii.chip),
@@ -429,10 +466,10 @@ final class _TournamentEmptyState extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpace.xl),
+      padding: const EdgeInsets.all(AppSpace.lg),
       decoration: BoxDecoration(
         color: AppPalette.surfaceSoft,
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: AppPalette.line),
       ),
       child: Column(
@@ -441,7 +478,7 @@ final class _TournamentEmptyState extends StatelessWidget {
           Text('No tournaments yet', style: theme.textTheme.titleLarge),
           const SizedBox(height: AppSpace.sm),
           Text(
-            'Create your first tournament draft to start wiring categories, entries, and scheduling against real Firestore data.',
+            'Create your first tournament draft to start planning categories, entries, and match flow.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: AppPalette.inkSoft,
             ),
@@ -462,17 +499,17 @@ final class _TournamentErrorState extends StatelessWidget {
     final theme = Theme.of(context);
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.all(AppSpace.lg),
+      padding: const EdgeInsets.all(AppSpace.md),
       decoration: BoxDecoration(
         color: const Color(0x24C97D6B),
-        borderRadius: BorderRadius.circular(24),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: const Color(0x47C97D6B)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Firestore needs attention',
+            'Workspace needs attention',
             style: theme.textTheme.titleLarge?.copyWith(
               color: const Color(0xFF7B4D42),
             ),
@@ -493,12 +530,12 @@ final class _TournamentErrorState extends StatelessWidget {
 String _friendlyError(Object error) {
   final message = error.toString();
   if (message.contains('permission-denied')) {
-    return 'Deploy the Firestore rules in this repo, then reload the app.';
+    return 'This organizer account cannot create or update tournaments yet. Reload and try again.';
   }
   if (message.contains('failed-precondition')) {
-    return 'Create the Firestore database in Firebase Console first, then reload the app.';
+    return 'Tournament data is not ready yet in this environment. Try again in a moment.';
   }
-  return message;
+  return 'We could not update this tournament right now. Please try again.';
 }
 
 String _formatDate(DateTime value) {

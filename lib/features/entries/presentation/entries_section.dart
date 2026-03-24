@@ -926,10 +926,10 @@ final class _EntriesErrorState extends StatelessWidget {
 String _friendlyError(Object error) {
   final message = error.toString();
   if (message.contains('permission-denied')) {
-    return 'Deploy the updated Firestore rules, then reload the app.';
+    return 'This organizer account cannot update entries yet. Reload and try again.';
   }
   if (message.contains('failed-precondition')) {
-    return 'Create the Firestore database in Firebase Console first, then reload the app.';
+    return 'Entry data is not ready yet in this environment. Try again in a moment.';
   }
   return message;
 }
