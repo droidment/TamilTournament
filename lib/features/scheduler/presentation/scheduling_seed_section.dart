@@ -37,9 +37,11 @@ final class _SchedulingSeedSectionState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const WorkspaceSectionLead(
-          title: 'Seeding',
+          title: 'Seeding board',
           description:
               'Start from assigned entry seeds, adjust the live order per category, and save the bracket order for scheduling.',
+          icon: Icons.format_list_numbered_rounded,
+          accent: AppPalette.apricot,
         ),
         const SizedBox(height: AppSpace.lg),
         if (state.hasValue)

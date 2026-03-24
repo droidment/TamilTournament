@@ -30,6 +30,30 @@ final class WorkspaceStatRail extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxWidth < 620) {
+          if (metrics.length <= 3) {
+            return Container(
+              padding: const EdgeInsets.all(AppSpace.xs),
+              decoration: BoxDecoration(
+                color: AppPalette.surface,
+                borderRadius: BorderRadius.circular(AppRadii.panel),
+                border: Border.all(
+                  color: AppPalette.line.withValues(alpha: 0.9),
+                ),
+              ),
+              child: Row(
+                children: [
+                  for (var index = 0; index < metrics.length; index++) ...[
+                    Expanded(
+                      child: WorkspaceMetricTile(metric: metrics[index]),
+                    ),
+                    if (index < metrics.length - 1)
+                      const SizedBox(width: AppSpace.xs),
+                  ],
+                ],
+              ),
+            );
+          }
+
           final compactWidth = metrics.length == 1
               ? constraints.maxWidth
               : (constraints.maxWidth - AppSpace.sm) / 2;
@@ -76,65 +100,99 @@ final class WorkspaceMetricTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final isCompact = MediaQuery.sizeOf(context).width < 620;
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = MediaQuery.sizeOf(context).width < 620;
+        final useStackedCompact = isCompact && constraints.maxWidth < 124;
 
-    return AnimatedContainer(
-      duration: const Duration(milliseconds: 180),
-      curve: Curves.easeOutCubic,
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpace.md,
-        vertical: AppSpace.sm,
-      ),
-      decoration: BoxDecoration(
-        color: metric.isHighlighted
-            ? AppPalette.surfaceSoft
-            : Colors.transparent,
-        borderRadius: BorderRadius.circular(AppRadii.panel),
-        border: metric.isHighlighted
-            ? Border.all(color: AppPalette.line)
-            : null,
-      ),
-      child: isCompact
-          ? Row(
-              children: [
-                Text(
-                  metric.value,
-                  style: AppTheme.numeric(theme.textTheme.titleMedium).copyWith(
-                    color: metric.foreground,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(width: AppSpace.sm),
-                Text(
-                  metric.label,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppPalette.inkSoft,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            )
-          : RichText(
-              text: TextSpan(
-                children: [
-                  TextSpan(
-                    text: metric.value,
-                    style: AppTheme.numeric(theme.textTheme.titleMedium)
-                        .copyWith(
-                          color: metric.foreground,
-                          fontWeight: FontWeight.w700,
+        return AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOutCubic,
+          padding: EdgeInsets.symmetric(
+            horizontal: useStackedCompact ? AppSpace.sm : AppSpace.md,
+            vertical: AppSpace.sm,
+          ),
+          decoration: BoxDecoration(
+            color: metric.isHighlighted
+                ? AppPalette.surfaceSoft
+                : Colors.transparent,
+            borderRadius: BorderRadius.circular(AppRadii.panel),
+            border: metric.isHighlighted
+                ? Border.all(color: AppPalette.line)
+                : null,
+          ),
+          child: !isCompact
+              ? RichText(
+                  text: TextSpan(
+                    children: [
+                      TextSpan(
+                        text: metric.value,
+                        style: AppTheme.numeric(theme.textTheme.titleMedium)
+                            .copyWith(
+                              color: metric.foreground,
+                              fontWeight: FontWeight.w700,
+                            ),
+                      ),
+                      TextSpan(
+                        text: ' ${metric.label}',
+                        style: theme.textTheme.bodyLarge?.copyWith(
+                          color: AppPalette.inkSoft,
+                          fontWeight: FontWeight.w600,
                         ),
+                      ),
+                    ],
                   ),
-                  TextSpan(
-                    text: ' ${metric.label}',
-                    style: theme.textTheme.bodyLarge?.copyWith(
-                      color: AppPalette.inkSoft,
-                      fontWeight: FontWeight.w600,
+                )
+              : useStackedCompact
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      metric.value,
+                      style: AppTheme.numeric(theme.textTheme.titleMedium)
+                          .copyWith(
+                            color: metric.foreground,
+                            fontWeight: FontWeight.w700,
+                          ),
                     ),
-                  ),
-                ],
-              ),
-            ),
+                    const SizedBox(height: 2),
+                    Text(
+                      metric.label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppPalette.inkSoft,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    Text(
+                      metric.value,
+                      style: AppTheme.numeric(theme.textTheme.titleMedium)
+                          .copyWith(
+                            color: metric.foreground,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(width: AppSpace.sm),
+                    Expanded(
+                      child: Text(
+                        metric.label,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppPalette.inkSoft,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+        );
+      },
     );
   }
 }
@@ -143,28 +201,55 @@ final class WorkspaceSectionLead extends StatelessWidget {
   const WorkspaceSectionLead({
     required this.title,
     required this.description,
+    this.icon,
+    this.accent,
     this.trailing,
     super.key,
   });
 
   final String title;
   final String description;
+  final IconData? icon;
+  final Color? accent;
   final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final resolvedAccent = accent ?? AppPalette.sageStrong;
+
     return LayoutBuilder(
       builder: (context, constraints) {
+        final titleText = Text(
+          title,
+          style: constraints.maxWidth < 620
+              ? theme.textTheme.headlineLarge
+              : theme.textTheme.displaySmall,
+        );
+
+        final titleWidget = icon == null
+            ? titleText
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: constraints.maxWidth < 620 ? 28 : 30,
+                    height: constraints.maxWidth < 620 ? 28 : 30,
+                    decoration: BoxDecoration(
+                      color: resolvedAccent.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Icon(icon, size: 16, color: resolvedAccent),
+                  ),
+                  const SizedBox(width: AppSpace.sm),
+                  Flexible(child: titleText),
+                ],
+              );
+
         final titleBlock = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              title,
-              style: constraints.maxWidth < 620
-                  ? theme.textTheme.headlineLarge
-                  : theme.textTheme.displaySmall,
-            ),
+            titleWidget,
             const SizedBox(height: AppSpace.xs),
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 640),
@@ -180,53 +265,94 @@ final class WorkspaceSectionLead extends StatelessWidget {
           ],
         );
 
-        if (trailing == null) {
-          return titleBlock;
-        }
-
-        if (constraints.maxWidth < 760) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
+        final leadContent = trailing == null
+            ? titleBlock
+            : constraints.maxWidth < 760
+            ? Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(child: titleWidget),
+                      const SizedBox(width: AppSpace.md),
+                      trailing!,
+                    ],
+                  ),
+                  const SizedBox(height: AppSpace.xs),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 640),
                     child: Text(
-                      title,
-                      style: constraints.maxWidth < 620
-                          ? theme.textTheme.headlineLarge
-                          : theme.textTheme.displaySmall,
+                      description,
+                      style:
+                          (constraints.maxWidth < 620
+                                  ? theme.textTheme.bodySmall
+                                  : theme.textTheme.bodyMedium)
+                              ?.copyWith(color: AppPalette.inkSoft),
                     ),
                   ),
-                  const SizedBox(width: AppSpace.md),
+                ],
+              )
+            : Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(child: titleBlock),
+                  const SizedBox(width: AppSpace.lg),
                   trailing!,
                 ],
-              ),
-              const SizedBox(height: AppSpace.xs),
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxWidth: 640),
-                child: Text(
-                  description,
-                  style:
-                      (constraints.maxWidth < 620
-                              ? theme.textTheme.bodySmall
-                              : theme.textTheme.bodyMedium)
-                          ?.copyWith(color: AppPalette.inkSoft),
-                ),
-              ),
-              const SizedBox(height: AppSpace.md),
-            ],
-          );
+              );
+
+        if (icon == null) {
+          return leadContent;
         }
 
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: titleBlock),
-            const SizedBox(width: AppSpace.lg),
-            trailing!,
-          ],
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(
+            horizontal: constraints.maxWidth < 620 ? AppSpace.md : AppSpace.lg,
+            vertical: constraints.maxWidth < 620 ? AppSpace.md : AppSpace.lg,
+          ),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                resolvedAccent.withValues(alpha: 0.14),
+                Colors.white.withValues(alpha: 0.72),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: resolvedAccent.withValues(alpha: 0.24)),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                right: constraints.maxWidth < 620 ? -8 : 4,
+                top: constraints.maxWidth < 620 ? -8 : -2,
+                child: Icon(
+                  icon,
+                  size: constraints.maxWidth < 620 ? 40 : 52,
+                  color: resolvedAccent.withValues(alpha: 0.12),
+                ),
+              ),
+              Positioned(
+                left: 0,
+                top: 2,
+                bottom: 2,
+                child: Container(
+                  width: 5,
+                  decoration: BoxDecoration(
+                    color: resolvedAccent,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              Padding(
+                padding: const EdgeInsets.only(left: AppSpace.md),
+                child: leadContent,
+              ),
+            ],
+          ),
         );
       },
     );

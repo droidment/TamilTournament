@@ -261,9 +261,11 @@ class _EntriesSectionState extends ConsumerState<EntriesSection> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         WorkspaceSectionLead(
-          title: 'Registered teams',
+          title: 'Team desk',
           description:
-              'Capture teams, assign seeds, and mark them checked in as they arrive at the venue.',
+              'Onboard pairs, verify arrivals, and tidy the roster before matches begin.',
+          icon: Icons.groups_rounded,
+          accent: AppPalette.oliveStrong,
           trailing: FilledButton(
             onPressed: canCreateEntry
                 ? () => _showCreateEntryDialog(
@@ -700,60 +702,52 @@ final class _EntryRowCard extends StatelessWidget {
                   ],
                 );
 
+                final actionRow = Wrap(
+                  spacing: AppSpace.xs,
+                  runSpacing: AppSpace.xs,
+                  children: [
+                    _EntryActionLink(
+                      label: 'Edit',
+                      icon: Icons.edit_outlined,
+                      compact: isCompact,
+                      onTap: isBusy ? null : onEdit,
+                    ),
+                    _EntryActionLink(
+                      label: 'Delete',
+                      icon: Icons.delete_outline_rounded,
+                      compact: isCompact,
+                      destructive: true,
+                      onTap: isBusy ? null : onDelete,
+                    ),
+                  ],
+                );
+
                 final footer = Container(
-                  margin: const EdgeInsets.only(top: AppSpace.lg),
+                  margin: EdgeInsets.only(
+                    top: isCompact ? AppSpace.md : AppSpace.lg,
+                  ),
                   padding: const EdgeInsets.only(top: AppSpace.md),
                   decoration: const BoxDecoration(
                     border: Border(top: BorderSide(color: AppPalette.line)),
                   ),
                   child: isCompact
-                      ? Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
+                      ? Row(
                           children: [
-                            Wrap(
-                              spacing: AppSpace.sm,
-                              runSpacing: AppSpace.sm,
-                              children: [
-                                _EntryActionLink(
-                                  label: 'Edit',
-                                  icon: Icons.edit_outlined,
-                                  onTap: isBusy ? null : onEdit,
-                                ),
-                                _EntryActionLink(
-                                  label: 'Delete',
-                                  icon: Icons.delete_outline_rounded,
-                                  destructive: true,
-                                  onTap: isBusy ? null : onDelete,
-                                ),
-                              ],
+                            Expanded(
+                              child: _CheckInControl(
+                                checkedIn: entry.checkedIn,
+                                isBusy: isBusy,
+                                onToggle: onToggleCheckedIn,
+                                compact: true,
+                              ),
                             ),
-                            const SizedBox(height: AppSpace.md),
-                            _CheckInControl(
-                              checkedIn: entry.checkedIn,
-                              isBusy: isBusy,
-                              onToggle: onToggleCheckedIn,
-                            ),
+                            const SizedBox(width: AppSpace.sm),
+                            actionRow,
                           ],
                         )
                       : Row(
                           children: [
-                            Wrap(
-                              spacing: AppSpace.sm,
-                              runSpacing: AppSpace.sm,
-                              children: [
-                                _EntryActionLink(
-                                  label: 'Edit',
-                                  icon: Icons.edit_outlined,
-                                  onTap: isBusy ? null : onEdit,
-                                ),
-                                _EntryActionLink(
-                                  label: 'Delete',
-                                  icon: Icons.delete_outline_rounded,
-                                  destructive: true,
-                                  onTap: isBusy ? null : onDelete,
-                                ),
-                              ],
-                            ),
+                            actionRow,
                             const Spacer(),
                             _CheckInControl(
                               checkedIn: entry.checkedIn,
@@ -764,9 +758,35 @@ final class _EntryRowCard extends StatelessWidget {
                         ),
                 );
 
-                return Column(
+                if (isCompact) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          _TeamAvatar(entry: entry),
+                          const SizedBox(width: AppSpace.md),
+                          Expanded(child: infoBlock),
+                        ],
+                      ),
+                      footer,
+                    ],
+                  );
+                }
+
+                return Row(
                   crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [infoBlock, footer],
+                  children: [
+                    _TeamAvatar(entry: entry, compact: false),
+                    const SizedBox(width: AppSpace.lg),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [infoBlock, footer],
+                      ),
+                    ),
+                  ],
                 );
               },
             ),
@@ -832,12 +852,14 @@ final class _EntryActionLink extends StatelessWidget {
     required this.label,
     required this.icon,
     required this.onTap,
+    this.compact = false,
     this.destructive = false,
   });
 
   final String label;
   final IconData icon;
   final VoidCallback? onTap;
+  final bool compact;
   final bool destructive;
 
   @override
@@ -845,6 +867,30 @@ final class _EntryActionLink extends StatelessWidget {
     final foreground = destructive
         ? const Color(0xFF9A5A49)
         : AppPalette.inkSoft;
+
+    if (compact) {
+      return Tooltip(
+        message: label,
+        child: InkResponse(
+          onTap: onTap,
+          radius: 20,
+          child: Container(
+            width: 34,
+            height: 34,
+            decoration: BoxDecoration(
+              color: destructive
+                  ? const Color(0x14C97D6B)
+                  : AppPalette.surfaceSoft,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: destructive ? const Color(0x33C97D6B) : AppPalette.line,
+              ),
+            ),
+            child: Icon(icon, size: 18, color: foreground),
+          ),
+        ),
+      );
+    }
 
     return TextButton.icon(
       onPressed: onTap,
@@ -864,23 +910,51 @@ final class _CheckInControl extends StatelessWidget {
     required this.checkedIn,
     required this.isBusy,
     required this.onToggle,
+    this.compact = false,
   });
 
   final bool checkedIn;
   final bool isBusy;
   final VoidCallback onToggle;
+  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final label = isBusy
+        ? 'Updating...'
+        : (checkedIn ? 'Checked in' : 'Mark checked in');
+
+    if (compact) {
+      return Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: checkedIn ? AppPalette.ink : AppPalette.inkSoft,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(width: AppSpace.xs),
+          Checkbox(
+            value: checkedIn,
+            onChanged: isBusy ? null : (_) => onToggle(),
+            visualDensity: VisualDensity.compact,
+          ),
+        ],
+      );
+    }
 
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: [
         Text(
-          isBusy
-              ? 'Updating...'
-              : (checkedIn ? 'Checked in' : 'Mark checked in'),
+          label,
           style: theme.textTheme.bodySmall?.copyWith(
             color: checkedIn ? AppPalette.ink : AppPalette.inkSoft,
           ),
@@ -893,6 +967,159 @@ final class _CheckInControl extends StatelessWidget {
         ),
       ],
     );
+  }
+}
+
+final class _TeamAvatar extends StatelessWidget {
+  const _TeamAvatar({required this.entry, this.compact = true});
+
+  final TournamentEntry entry;
+  final bool compact;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = _TeamAvatarPalette.forSeed(entry.id.hashCode);
+    final size = compact ? 64.0 : 76.0;
+    final playerSize = compact ? 28.0 : 32.0;
+
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [palette.background, palette.backgroundStrong],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: palette.border),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            left: compact ? 8 : 10,
+            bottom: compact ? 8 : 10,
+            child: _PlayerBadge(
+              size: playerSize,
+              fill: Colors.white.withValues(alpha: 0.84),
+              accent: palette.accent,
+            ),
+          ),
+          Positioned(
+            right: compact ? 8 : 10,
+            top: compact ? 8 : 10,
+            child: _PlayerBadge(
+              size: playerSize,
+              fill: Colors.white.withValues(alpha: 0.74),
+              accent: palette.accentSoft,
+            ),
+          ),
+          Positioned(
+            right: compact ? 6 : 8,
+            bottom: compact ? 8 : 10,
+            child: Transform.rotate(
+              angle: -0.35,
+              child: Icon(
+                Icons.sports_tennis_rounded,
+                size: compact ? 18 : 20,
+                color: palette.accent,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+final class _PlayerBadge extends StatelessWidget {
+  const _PlayerBadge({
+    required this.size,
+    required this.fill,
+    required this.accent,
+  });
+
+  final double size;
+  final Color fill;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: size,
+      height: size,
+      decoration: BoxDecoration(
+        color: fill,
+        shape: BoxShape.circle,
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x160C1511),
+            blurRadius: 8,
+            offset: Offset(0, 3),
+          ),
+        ],
+      ),
+      child: Icon(Icons.person_rounded, size: size * 0.62, color: accent),
+    );
+  }
+}
+
+final class _TeamAvatarPalette {
+  const _TeamAvatarPalette({
+    required this.background,
+    required this.backgroundStrong,
+    required this.border,
+    required this.accent,
+    required this.accentSoft,
+  });
+
+  final Color background;
+  final Color backgroundStrong;
+  final Color border;
+  final Color accent;
+  final Color accentSoft;
+
+  static const List<_TeamAvatarPalette> _palettes = [
+    _TeamAvatarPalette(
+      background: Color(0xFFE7F1EC),
+      backgroundStrong: Color(0xFFD5E7DE),
+      border: Color(0xFFC7DCCF),
+      accent: Color(0xFF4C7267),
+      accentSoft: Color(0xFF729689),
+    ),
+    _TeamAvatarPalette(
+      background: Color(0xFFE7EFF7),
+      backgroundStrong: Color(0xFFD6E4F1),
+      border: Color(0xFFC5D6E6),
+      accent: Color(0xFF486A82),
+      accentSoft: Color(0xFF6F90A6),
+    ),
+    _TeamAvatarPalette(
+      background: Color(0xFFF6ECE5),
+      backgroundStrong: Color(0xFFEEDCCD),
+      border: Color(0xFFE0CCBC),
+      accent: Color(0xFF8B6344),
+      accentSoft: Color(0xFFB08969),
+    ),
+    _TeamAvatarPalette(
+      background: Color(0xFFF1E8EF),
+      backgroundStrong: Color(0xFFE6D7E2),
+      border: Color(0xFFD9C8D3),
+      accent: Color(0xFF7C5E73),
+      accentSoft: Color(0xFFA18397),
+    ),
+    _TeamAvatarPalette(
+      background: Color(0xFFEAF1E3),
+      backgroundStrong: Color(0xFFDCE8D0),
+      border: Color(0xFFCDDCBD),
+      accent: Color(0xFF65764A),
+      accentSoft: Color(0xFF89996B),
+    ),
+  ];
+
+  static _TeamAvatarPalette forSeed(int seed) {
+    final index = seed.abs() % _palettes.length;
+    return _palettes[index];
   }
 }
 

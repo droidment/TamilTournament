@@ -23,9 +23,11 @@ final class CategoryScheduleSection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const WorkspaceSectionLead(
-          title: 'Schedule',
+          title: 'Match flow',
           description:
               'Generate category groups, rounds, and qualification paths from the teams you have already seeded.',
+          icon: Icons.calendar_view_week_rounded,
+          accent: AppPalette.sageStrong,
         ),
         const SizedBox(height: AppSpace.lg),
         if (state.hasValue)

@@ -266,9 +266,11 @@ class _CourtManagementSectionState
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const WorkspaceSectionLead(
-          title: 'Courts',
+          title: 'Court desk',
           description:
               'Set the active court pool before live scheduling begins, then pause or restore courts as the venue changes.',
+          icon: Icons.sports_tennis_rounded,
+          accent: Color(0xFF618374),
         ),
         const SizedBox(height: AppSpace.lg),
         if (courts.hasValue)

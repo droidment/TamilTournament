@@ -23,6 +23,14 @@ extension on _TournamentWorkspaceTab {
     _TournamentWorkspaceTab.courts => 'Courts',
   };
 
+  String get headingLabel => switch (this) {
+    _TournamentWorkspaceTab.setup => 'Setup',
+    _TournamentWorkspaceTab.teams => 'Team desk',
+    _TournamentWorkspaceTab.seeding => 'Seeding board',
+    _TournamentWorkspaceTab.schedule => 'Match flow',
+    _TournamentWorkspaceTab.courts => 'Court desk',
+  };
+
   IconData get icon => switch (this) {
     _TournamentWorkspaceTab.setup => Icons.category_rounded,
     _TournamentWorkspaceTab.teams => Icons.groups_rounded,
@@ -37,6 +45,59 @@ extension on _TournamentWorkspaceTab {
     _TournamentWorkspaceTab.seeding => AppPalette.apricot,
     _TournamentWorkspaceTab.schedule => AppPalette.sageStrong,
     _TournamentWorkspaceTab.courts => const Color(0xFF618374),
+  };
+
+  Color get surface => switch (this) {
+    _TournamentWorkspaceTab.setup => AppPalette.skySoft,
+    _TournamentWorkspaceTab.teams => const Color(0xFFE8F2E8),
+    _TournamentWorkspaceTab.seeding => AppPalette.apricotSoft,
+    _TournamentWorkspaceTab.schedule => AppPalette.sageSoft,
+    _TournamentWorkspaceTab.courts => const Color(0xFFE7F0EA),
+  };
+
+  Color get surfaceAlt => switch (this) {
+    _TournamentWorkspaceTab.setup => const Color(0xFFF2F8F5),
+    _TournamentWorkspaceTab.teams => const Color(0xFFF3F7EF),
+    _TournamentWorkspaceTab.seeding => const Color(0xFFF8F1E4),
+    _TournamentWorkspaceTab.schedule => const Color(0xFFEFF7F2),
+    _TournamentWorkspaceTab.courts => const Color(0xFFF2F7F4),
+  };
+
+  Color get darkSurface => switch (this) {
+    _TournamentWorkspaceTab.setup => AppPalette.ink,
+    _TournamentWorkspaceTab.teams => const Color(0xFF45533D),
+    _TournamentWorkspaceTab.seeding => const Color(0xFF6E5841),
+    _TournamentWorkspaceTab.schedule => const Color(0xFF365447),
+    _TournamentWorkspaceTab.courts => const Color(0xFF314A3D),
+  };
+
+  Color get darkSurfaceAlt => switch (this) {
+    _TournamentWorkspaceTab.setup => const Color(0xFF273731),
+    _TournamentWorkspaceTab.teams => const Color(0xFF5B6B51),
+    _TournamentWorkspaceTab.seeding => const Color(0xFF8B6F52),
+    _TournamentWorkspaceTab.schedule => const Color(0xFF47685A),
+    _TournamentWorkspaceTab.courts => const Color(0xFF456053),
+  };
+
+  String get bannerTitle => switch (this) {
+    _TournamentWorkspaceTab.setup => 'Setup',
+    _TournamentWorkspaceTab.teams => 'Team desk',
+    _TournamentWorkspaceTab.seeding => 'Seeding board',
+    _TournamentWorkspaceTab.schedule => 'Match flow',
+    _TournamentWorkspaceTab.courts => 'Court desk',
+  };
+
+  String get bannerDescription => switch (this) {
+    _TournamentWorkspaceTab.setup =>
+      'Configure categories and tournament rules.',
+    _TournamentWorkspaceTab.teams =>
+      'Onboard pairs, verify arrivals, and tidy the roster.',
+    _TournamentWorkspaceTab.seeding =>
+      'Assign order and prepare the draw before play starts.',
+    _TournamentWorkspaceTab.schedule =>
+      'Stage matches, monitor queues, and keep rounds moving.',
+    _TournamentWorkspaceTab.courts =>
+      'Track active courts, open slots, and readiness on the floor.',
   };
 }
 
@@ -168,6 +229,8 @@ final class _TournamentDetailBody extends StatelessWidget {
         return LayoutBuilder(
           builder: (context, constraints) {
             final isCompact = constraints.maxWidth < 900;
+            final showsTournamentHero =
+                selectedTab == _TournamentWorkspaceTab.setup;
 
             return Column(
               children: [
@@ -176,11 +239,11 @@ final class _TournamentDetailBody extends StatelessWidget {
                   selectedTab: selectedTab,
                   collapseProgress: collapseProgress,
                 ),
-                if (isCompact) ...[
+                if (isCompact && showsTournamentHero) ...[
                   const SizedBox(height: AppSpace.sm),
-                  _CompactTournamentSummary(tournament: tournament),
+                  _SetupCompactHero(tournament: tournament),
                   const SizedBox(height: AppSpace.sm),
-                ] else ...[
+                ] else if (!isCompact && showsTournamentHero) ...[
                   ClipRect(
                     child: Align(
                       heightFactor: 1 - collapseProgress,
@@ -189,15 +252,14 @@ final class _TournamentDetailBody extends StatelessWidget {
                         opacity: 1 - collapseProgress,
                         child: Padding(
                           padding: const EdgeInsets.only(top: AppSpace.md),
-                          child: _TournamentHeroCard(
-                            tournament: tournament,
-                            selectedTab: selectedTab,
-                          ),
+                          child: _SetupHeroCard(tournament: tournament),
                         ),
                       ),
                     ),
                   ),
                   SizedBox(height: _spaceBetween(18, 10, collapseProgress)),
+                ] else ...[
+                  const SizedBox(height: AppSpace.sm),
                 ],
                 if (isCompact) ...[
                   Expanded(
@@ -207,11 +269,17 @@ final class _TournamentDetailBody extends StatelessWidget {
                       scrollController: scrollController,
                     ),
                   ),
-                  const SizedBox(height: AppSpace.md),
-                  _BottomWorkspaceNavigation(
-                    selectedTab: selectedTab,
-                    onSelectTab: onSelectTab,
-                    tabs: _allTabs,
+                  const SizedBox(height: AppSpace.sm),
+                  SafeArea(
+                    top: false,
+                    child: SizedBox(
+                      width: double.infinity,
+                      child: _BottomWorkspaceNavigation(
+                        selectedTab: selectedTab,
+                        onSelectTab: onSelectTab,
+                        tabs: _allTabs,
+                      ),
+                    ),
                   ),
                 ] else
                   Expanded(
@@ -247,6 +315,129 @@ final class _TournamentDetailBody extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
+final class _WorkspaceTabBanner extends StatelessWidget {
+  const _WorkspaceTabBanner({required this.tab, required this.tournament});
+
+  final _TournamentWorkspaceTab tab;
+  final Tournament tournament;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 720;
+        final statLabel = switch (tab) {
+          _TournamentWorkspaceTab.teams => '${tournament.stats.entries} teams',
+          _TournamentWorkspaceTab.seeding =>
+            '${tournament.stats.entries} entries to order',
+          _TournamentWorkspaceTab.schedule =>
+            '${tournament.stats.matches} matches tracked',
+          _TournamentWorkspaceTab.courts =>
+            '${tournament.activeCourtCount} courts active',
+          _TournamentWorkspaceTab.setup =>
+            '${tournament.stats.categories} categories',
+        };
+
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.symmetric(
+            horizontal: isCompact ? AppSpace.md : AppSpace.lg,
+            vertical: isCompact ? AppSpace.md : AppSpace.lg,
+          ),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [tab.surface, tab.surfaceAlt],
+            ),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: tab.accent.withValues(alpha: 0.24)),
+          ),
+          child: Stack(
+            children: [
+              Positioned(
+                right: isCompact ? -10 : 8,
+                top: isCompact ? -8 : 2,
+                child: Icon(
+                  tab.icon,
+                  size: isCompact ? 48 : 64,
+                  color: tab.accent.withValues(alpha: 0.12),
+                ),
+              ),
+              if (!isCompact)
+                Positioned(
+                  right: -18,
+                  bottom: -24,
+                  child: Container(
+                    width: 108,
+                    height: 108,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: tab.accent.withValues(alpha: 0.08),
+                    ),
+                  ),
+                ),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    width: 6,
+                    height: isCompact ? 56 : 64,
+                    decoration: BoxDecoration(
+                      color: tab.accent,
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpace.md),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          tab.bannerTitle,
+                          style: isCompact
+                              ? theme.textTheme.titleLarge?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                )
+                              : theme.textTheme.headlineMedium?.copyWith(
+                                  fontWeight: FontWeight.w700,
+                                ),
+                        ),
+                        const SizedBox(height: AppSpace.xs),
+                        ConstrainedBox(
+                          constraints: BoxConstraints(
+                            maxWidth: isCompact ? 320 : 520,
+                          ),
+                          child: Text(
+                            tab.bannerDescription,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: AppPalette.inkSoft,
+                              height: 1.4,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: AppSpace.sm),
+                        _HeroInfoChip(
+                          icon: tab.icon,
+                          label: statLabel,
+                          tint: tab.accent,
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 final class _WorkspaceToolbar extends StatelessWidget {
   const _WorkspaceToolbar({
     required this.tournament,
@@ -265,6 +456,117 @@ final class _WorkspaceToolbar extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isCompact = constraints.maxWidth < 720;
+        final usesDarkHeader = selectedTab != _TournamentWorkspaceTab.setup;
+
+        if (usesDarkHeader) {
+          final foreground = Colors.white.withValues(alpha: 0.96);
+          final secondary = Colors.white.withValues(alpha: 0.76);
+          final darkStyle = theme.textTheme.headlineMedium?.copyWith(
+            color: foreground,
+            fontWeight: FontWeight.w700,
+            fontSize: _spaceBetween(22, 18, collapseProgress),
+          );
+          final darkSubStyle = theme.textTheme.titleMedium?.copyWith(
+            color: secondary,
+            fontSize: _spaceBetween(isCompact ? 15 : 16, 14, collapseProgress),
+          );
+
+          return Container(
+            width: double.infinity,
+            padding: EdgeInsets.fromLTRB(
+              isCompact ? AppSpace.sm : AppSpace.md,
+              isCompact ? AppSpace.sm : AppSpace.md,
+              isCompact ? AppSpace.md : AppSpace.lg,
+              isCompact ? AppSpace.md : AppSpace.lg,
+            ),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [selectedTab.darkSurface, selectedTab.darkSurfaceAlt],
+              ),
+              borderRadius: BorderRadius.circular(18),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x1A0C1511),
+                  blurRadius: 24,
+                  offset: Offset(0, 12),
+                ),
+              ],
+            ),
+            child: Stack(
+              children: [
+                Positioned(
+                  right: isCompact ? -4 : 8,
+                  top: isCompact ? -2 : 0,
+                  child: Icon(
+                    selectedTab.icon,
+                    size: isCompact ? 56 : 72,
+                    color: Colors.white.withValues(alpha: 0.10),
+                  ),
+                ),
+                Positioned(
+                  right: isCompact ? 20 : 38,
+                  bottom: isCompact ? -20 : -26,
+                  child: Container(
+                    width: isCompact ? 74 : 96,
+                    height: isCompact ? 74 : 96,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: selectedTab.accent.withValues(alpha: 0.14),
+                    ),
+                  ),
+                ),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    TextButton.icon(
+                      onPressed: () => context.go('/'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: foreground,
+                        backgroundColor: Colors.white.withValues(alpha: 0.08),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppSpace.sm,
+                          vertical: AppSpace.xs,
+                        ),
+                      ),
+                      icon: const Icon(Icons.arrow_back_rounded),
+                      label: const Text('Back'),
+                    ),
+                    const SizedBox(height: AppSpace.md),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Container(
+                          width: 6,
+                          height: isCompact ? 54 : 64,
+                          decoration: BoxDecoration(
+                            color: selectedTab.accent,
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                        ),
+                        const SizedBox(width: AppSpace.md),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(tournament.name, style: darkStyle),
+                              const SizedBox(height: AppSpace.xs),
+                              Text(
+                                '${tournament.status.label} / ${selectedTab.headingLabel}',
+                                style: darkSubStyle,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        }
 
         return Container(
           padding: const EdgeInsets.only(bottom: AppSpace.sm),
@@ -294,7 +596,7 @@ final class _WorkspaceToolbar extends StatelessWidget {
                     ),
                     const SizedBox(height: AppSpace.xs),
                     Text(
-                      '${tournament.status.label} / ${selectedTab.label}',
+                      '${tournament.status.label} / ${selectedTab.headingLabel}',
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: AppPalette.inkSoft,
                         fontSize: _spaceBetween(16, 14, collapseProgress),
@@ -323,7 +625,7 @@ final class _WorkspaceToolbar extends StatelessWidget {
                     ),
                     const SizedBox(width: AppSpace.md),
                     Text(
-                      '${tournament.status.label} / ${selectedTab.label}',
+                      '${tournament.status.label} / ${selectedTab.headingLabel}',
                       style: theme.textTheme.titleMedium?.copyWith(
                         color: AppPalette.inkSoft,
                         fontSize: _spaceBetween(18, 14, collapseProgress),
@@ -337,6 +639,7 @@ final class _WorkspaceToolbar extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 final class _CompactTournamentSummary extends StatelessWidget {
   const _CompactTournamentSummary({required this.tournament});
 
@@ -388,6 +691,7 @@ final class _CompactTournamentSummary extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 final class _TournamentHeroCard extends StatelessWidget {
   const _TournamentHeroCard({
     required this.tournament,
@@ -476,6 +780,430 @@ final class _TournamentHeroCard extends StatelessWidget {
             ],
           );
         },
+      ),
+    );
+  }
+}
+
+final class _SetupCompactHero extends StatelessWidget {
+  const _SetupCompactHero({required this.tournament});
+
+  final Tournament tournament;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final meta = '${tournament.venue} - ${_formatDate(tournament.startDate)}';
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFE9F4EF), Color(0xFFF7F3E7)],
+        ),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppPalette.lineStrong),
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -28,
+            right: -18,
+            child: Container(
+              width: 110,
+              height: 110,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppPalette.skySoft.withValues(alpha: 0.75),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -18,
+            right: 24,
+            child: Transform.rotate(
+              angle: -0.25,
+              child: Icon(
+                Icons.sports_tennis_rounded,
+                size: 42,
+                color: AppPalette.sageStrong.withValues(alpha: 0.18),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(AppSpace.lg),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Setup overview',
+                  style: AppTheme.numeric(theme.textTheme.labelLarge).copyWith(
+                    color: AppPalette.inkSoft,
+                    letterSpacing: 1.6,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: AppSpace.sm),
+                Text(
+                  tournament.name,
+                  style: theme.textTheme.headlineLarge?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: AppSpace.md),
+                Row(
+                  children: [
+                    Container(
+                      width: 34,
+                      height: 34,
+                      decoration: BoxDecoration(
+                        color: AppPalette.sage,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: const Icon(
+                        Icons.location_on_outlined,
+                        size: 18,
+                        color: AppPalette.sageStrong,
+                      ),
+                    ),
+                    const SizedBox(width: AppSpace.sm),
+                    Expanded(
+                      child: Text(
+                        meta,
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppPalette.ink,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpace.md),
+                Wrap(
+                  spacing: AppSpace.sm,
+                  runSpacing: AppSpace.sm,
+                  children: [
+                    _HeroInfoChip(
+                      icon: Icons.category_rounded,
+                      label: '${tournament.stats.categories} categories',
+                    ),
+                    _HeroInfoChip(
+                      icon: Icons.groups_rounded,
+                      label: '${tournament.stats.entries} teams',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+final class _SetupHeroCard extends StatelessWidget {
+  const _SetupHeroCard({required this.tournament});
+
+  final Tournament tournament;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFFE4F0EA), Color(0xFFF6F0E4)],
+        ),
+        borderRadius: const BorderRadius.all(Radius.circular(22)),
+        border: Border.all(color: AppPalette.lineStrong),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x110C1511),
+            blurRadius: 28,
+            offset: Offset(0, 14),
+          ),
+        ],
+      ),
+      child: Stack(
+        children: [
+          Positioned(
+            top: -54,
+            right: -24,
+            child: Container(
+              width: 240,
+              height: 240,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppPalette.skySoft.withValues(alpha: 0.72),
+              ),
+            ),
+          ),
+          Positioned(
+            bottom: -72,
+            left: 140,
+            child: Container(
+              width: 220,
+              height: 220,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: AppPalette.oliveSoft.withValues(alpha: 0.55),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 42,
+            top: 28,
+            child: Transform.rotate(
+              angle: -0.24,
+              child: Icon(
+                Icons.sports_tennis_rounded,
+                size: 84,
+                color: AppPalette.sageStrong.withValues(alpha: 0.12),
+              ),
+            ),
+          ),
+          Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(22),
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.white.withValues(alpha: 0.18),
+                    Colors.white.withValues(alpha: 0.04),
+                  ],
+                ),
+              ),
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.all(AppSpace.xxl),
+            child: LayoutBuilder(
+              builder: (context, constraints) {
+                final meta =
+                    '${tournament.venue} - ${_formatDate(tournament.startDate)}';
+                final isNarrow = constraints.maxWidth < 900;
+                final titleStyle = theme.textTheme.displayLarge?.copyWith(
+                  fontSize: constraints.maxWidth < 1080 ? 38 : 50,
+                  fontWeight: FontWeight.w700,
+                  height: 1.02,
+                );
+
+                final overviewPanel = Container(
+                  padding: const EdgeInsets.all(AppSpace.lg),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.66),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.75),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Tournament snapshot',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpace.sm),
+                      Text(
+                        'Everything you need to prepare the categories, teams, seeding, and court flow.',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppPalette.inkSoft,
+                        ),
+                      ),
+                      const SizedBox(height: AppSpace.lg),
+                      Wrap(
+                        spacing: AppSpace.sm,
+                        runSpacing: AppSpace.sm,
+                        children: [
+                          _HeroMetricTile(
+                            label: 'Categories',
+                            value: '${tournament.stats.categories}',
+                            accent: AppPalette.sky,
+                          ),
+                          _HeroMetricTile(
+                            label: 'Teams',
+                            value: '${tournament.stats.entries}',
+                            accent: AppPalette.sage,
+                          ),
+                          _HeroMetricTile(
+                            label: 'Matches',
+                            value: '${tournament.stats.matches}',
+                            accent: AppPalette.apricotSoft,
+                          ),
+                          _HeroMetricTile(
+                            label: 'Courts',
+                            value: '${tournament.activeCourtCount}',
+                            accent: AppPalette.oliveSoft,
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+
+                final intro = Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'TOURNAMENT CONTROL',
+                      style: AppTheme.numeric(theme.textTheme.labelLarge)
+                          .copyWith(
+                            color: AppPalette.inkSoft,
+                            letterSpacing: 2.2,
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                    const SizedBox(height: AppSpace.lg),
+                    Text(tournament.name, style: titleStyle),
+                    const SizedBox(height: AppSpace.md),
+                    ConstrainedBox(
+                      constraints: const BoxConstraints(maxWidth: 560),
+                      child: Text(
+                        'Build the draw, confirm arrivals, seed divisions, and keep the day moving without spreadsheet handoffs.',
+                        style: theme.textTheme.titleMedium?.copyWith(
+                          color: AppPalette.inkSoft,
+                          height: 1.45,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: AppSpace.lg),
+                    Wrap(
+                      spacing: AppSpace.sm,
+                      runSpacing: AppSpace.sm,
+                      children: [
+                        _HeroInfoChip(
+                          icon: Icons.location_on_outlined,
+                          label: meta,
+                        ),
+                        _HeroInfoChip(
+                          icon: Icons.flag_outlined,
+                          label: tournament.status.label,
+                        ),
+                      ],
+                    ),
+                  ],
+                );
+
+                if (isNarrow) {
+                  return Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      intro,
+                      const SizedBox(height: AppSpace.lg),
+                      overviewPanel,
+                    ],
+                  );
+                }
+
+                return Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(flex: 5, child: intro),
+                    const SizedBox(width: AppSpace.xl),
+                    Expanded(flex: 4, child: overviewPanel),
+                  ],
+                );
+              },
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+final class _HeroInfoChip extends StatelessWidget {
+  const _HeroInfoChip({required this.icon, required this.label, this.tint});
+
+  final IconData icon;
+  final String label;
+  final Color? tint;
+
+  @override
+  Widget build(BuildContext context) {
+    final chipTint = tint ?? AppPalette.sky;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.md,
+        vertical: AppSpace.sm,
+      ),
+      decoration: BoxDecoration(
+        color: chipTint.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: chipTint.withValues(alpha: 0.28)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: AppPalette.inkSoft),
+          const SizedBox(width: AppSpace.xs),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppPalette.ink,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+final class _HeroMetricTile extends StatelessWidget {
+  const _HeroMetricTile({
+    required this.label,
+    required this.value,
+    required this.accent,
+  });
+
+  final String label;
+  final String value;
+  final Color accent;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: 132,
+      padding: const EdgeInsets.all(AppSpace.md),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: 0.38),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.72)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppPalette.inkSoft,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: AppSpace.xs),
+          Text(
+            value,
+            style: AppTheme.numeric(
+              theme.textTheme.headlineMedium,
+            ).copyWith(color: AppPalette.ink, fontWeight: FontWeight.w700),
+          ),
+        ],
       ),
     );
   }
@@ -660,17 +1388,25 @@ final class _WorkspaceContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SingleChildScrollView(
-      key: ValueKey(tab),
-      controller: scrollController,
-      padding: const EdgeInsets.only(top: AppSpace.xs, bottom: AppSpace.lg),
-      child: Align(
-        alignment: Alignment.topLeft,
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 1120),
-          child: _WorkspaceSection(tab: tab, tournament: tournament),
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final contentWidth = constraints.maxWidth > 1120
+            ? 1120.0
+            : constraints.maxWidth;
+
+        return SingleChildScrollView(
+          key: ValueKey(tab),
+          controller: scrollController,
+          padding: const EdgeInsets.only(top: AppSpace.xs, bottom: AppSpace.lg),
+          child: Align(
+            alignment: Alignment.topLeft,
+            child: SizedBox(
+              width: contentWidth,
+              child: _WorkspaceSection(tab: tab, tournament: tournament),
+            ),
+          ),
+        );
+      },
     );
   }
 }
