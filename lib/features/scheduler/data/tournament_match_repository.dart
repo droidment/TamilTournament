@@ -102,6 +102,26 @@ final class TournamentMatchRepository {
       assignedCourts: matchDrafts.where((draft) => draft.assignedCourtId != null).length,
     );
   }
+
+  Future<void> resetTournamentLaunch({
+    required String tournamentId,
+  }) async {
+    final existingSnapshot = await _matches(tournamentId).get();
+    final batch = _firestore.batch();
+    final now = FieldValue.serverTimestamp();
+
+    for (final doc in existingSnapshot.docs) {
+      batch.delete(doc.reference);
+    }
+
+    batch.update(_tournament(tournamentId), <String, Object>{
+      'status': TournamentStatus.setup.value,
+      'stats.matches': 0,
+      'updatedAt': now,
+    });
+
+    await batch.commit();
+  }
 }
 
 final class _MatchDraft {

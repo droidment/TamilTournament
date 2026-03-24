@@ -7,6 +7,7 @@ import '../../scheduler/data/court_providers.dart';
 import '../../scheduler/data/tournament_match_providers.dart';
 import '../../scheduler/domain/category_schedule.dart';
 import '../../scheduler/domain/tournament_court.dart';
+import '../../scheduler/domain/tournament_match.dart';
 import '../domain/tournament.dart';
 import 'workspace_components.dart';
 
@@ -31,6 +32,24 @@ class _TournamentStartPanelState extends ConsumerState<TournamentStartPanel> {
       return;
     }
 
+    final hasExistingMatches = launchState.matchCount > 0;
+    final isAlreadyLive = widget.tournament.status == TournamentStatus.live;
+    final dialogTitle = isAlreadyLive
+        ? hasExistingMatches
+              ? 'Rebuild live schedule'
+              : 'Generate live schedule'
+        : 'Start tournament';
+    final dialogBody = isAlreadyLive
+        ? hasExistingMatches
+              ? 'This will replace the current live match set and reassign open courts from the current seed plans.'
+              : 'This will generate the live match set and assign open courts from the current seed plans.'
+        : 'This will mark the tournament as live and move operations into active match flow. Courts can still be paused or restored after launch.';
+    final confirmLabel = isAlreadyLive
+        ? hasExistingMatches
+              ? 'Rebuild schedule'
+              : 'Generate schedule'
+        : 'Start live play';
+
     final shouldStart = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -40,9 +59,9 @@ class _TournamentStartPanelState extends ConsumerState<TournamentStartPanel> {
           borderRadius: BorderRadius.circular(AppRadii.panel),
           side: const BorderSide(color: AppPalette.line),
         ),
-        title: const Text('Start tournament'),
+        title: Text(dialogTitle),
         content: Text(
-          'This will mark the tournament as live and move operations into active match flow. Courts can still be paused or restored after launch.',
+          dialogBody,
           style: Theme.of(
             context,
           ).textTheme.bodyMedium?.copyWith(color: AppPalette.inkSoft),
@@ -54,7 +73,7 @@ class _TournamentStartPanelState extends ConsumerState<TournamentStartPanel> {
           ),
           FilledButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('Start live play'),
+            child: Text(confirmLabel),
           ),
         ],
       ),
@@ -102,16 +121,86 @@ class _TournamentStartPanelState extends ConsumerState<TournamentStartPanel> {
     }
   }
 
+  Future<void> _returnToSetup() async {
+    if (_isSubmitting) {
+      return;
+    }
+
+    final shouldReset = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppPalette.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.panel),
+          side: const BorderSide(color: AppPalette.line),
+        ),
+        title: const Text('Return tournament to setup'),
+        content: Text(
+          'This will remove the generated live matches and move the tournament back to setup so you can reseed or relaunch cleanly.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppPalette.inkSoft),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Return to setup'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldReset != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await ref
+          .read(tournamentMatchRepositoryProvider)
+          .resetTournamentLaunch(tournamentId: widget.tournament.id);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Tournament returned to setup.')),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final schedule = ref.watch(
       categoryScheduleSnapshotProvider(widget.tournament.id),
     );
     final courts = ref.watch(tournamentCourtsProvider(widget.tournament.id));
+    final matches = ref.watch(tournamentMatchesProvider(widget.tournament.id));
     final launchState = _deriveLaunchState(
       tournament: widget.tournament,
       schedule: schedule,
       courts: courts,
+      matches: matches,
     );
 
     final accent = switch (widget.tournament.status) {
@@ -121,7 +210,6 @@ class _TournamentStartPanelState extends ConsumerState<TournamentStartPanel> {
       TournamentStatus.completed => AppPalette.oliveStrong,
     };
     final canStart = launchState.canStart &&
-        widget.tournament.status != TournamentStatus.live &&
         widget.tournament.status != TournamentStatus.completed;
     final isLive = widget.tournament.status == TournamentStatus.live;
     final theme = Theme.of(context);
@@ -203,36 +291,74 @@ class _TournamentStartPanelState extends ConsumerState<TournamentStartPanel> {
                           ),
                           const SizedBox(height: AppSpace.md),
                           SizedBox(
-                            width: isCompact ? double.infinity : 260,
-                            child: FilledButton.icon(
-                              onPressed: canStart && !_isSubmitting
-                                  ? () => _startTournament(launchState)
-                                  : null,
-                              icon: Icon(
-                                isLive
-                                    ? Icons.check_circle_rounded
-                                    : Icons.rocket_launch_rounded,
-                                size: 18,
-                              ),
-                              style: FilledButton.styleFrom(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: AppSpace.lg,
-                                  vertical: isCompact
-                                      ? AppSpace.md
-                                      : AppSpace.lg,
+                            width: isCompact ? double.infinity : null,
+                            child: Wrap(
+                              spacing: AppSpace.sm,
+                              runSpacing: AppSpace.sm,
+                              children: [
+                                SizedBox(
+                                  width: isCompact ? double.infinity : 260,
+                                  child: FilledButton.icon(
+                                    onPressed: canStart && !_isSubmitting
+                                        ? () => _startTournament(launchState)
+                                        : null,
+                                    icon: Icon(
+                                      isLive
+                                          ? Icons.autorenew_rounded
+                                          : Icons.rocket_launch_rounded,
+                                      size: 18,
+                                    ),
+                                    style: FilledButton.styleFrom(
+                                      padding: EdgeInsets.symmetric(
+                                        horizontal: AppSpace.lg,
+                                        vertical: isCompact
+                                            ? AppSpace.md
+                                            : AppSpace.lg,
+                                      ),
+                                      textStyle: theme.textTheme.titleMedium
+                                          ?.copyWith(fontWeight: FontWeight.w700),
+                                    ),
+                                    label: Text(
+                                      isLive
+                                          ? launchState.matchCount > 0
+                                                ? 'Rebuild live schedule'
+                                                : 'Generate live schedule'
+                                          : _isSubmitting
+                                              ? 'Starting tournament...'
+                                              : 'Start tournament',
+                                    ),
+                                  ),
                                 ),
-                                textStyle: theme.textTheme.titleMedium
-                                    ?.copyWith(fontWeight: FontWeight.w700),
-                              ),
-                              label: Text(
-                                isLive
-                                    ? 'Tournament live'
-                                    : _isSubmitting
-                                        ? 'Starting tournament...'
-                                        : 'Start tournament',
-                              ),
+                                if (isLive)
+                                  SizedBox(
+                                    width: isCompact ? double.infinity : 200,
+                                    child: OutlinedButton(
+                                      onPressed: _isSubmitting
+                                          ? null
+                                          : _returnToSetup,
+                                      style: OutlinedButton.styleFrom(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: AppSpace.lg,
+                                          vertical: isCompact
+                                              ? AppSpace.md
+                                              : AppSpace.lg,
+                                        ),
+                                      ),
+                                      child: const Text('Return to setup'),
+                                    ),
+                                  ),
+                              ],
                             ),
                           ),
+                          if (isLive && launchState.matchCount > 0) ...[
+                            const SizedBox(height: AppSpace.sm),
+                            Text(
+                              '${launchState.matchCount} live match records currently staged.',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppPalette.inkSoft,
+                              ),
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -327,6 +453,7 @@ final class _TournamentLaunchState {
     required this.blockers,
     required this.scheduleSnapshot,
     required this.courts,
+    required this.matchCount,
   });
 
   final int readyCategories;
@@ -337,6 +464,7 @@ final class _TournamentLaunchState {
   final List<String> blockers;
   final TournamentCategoryScheduleSnapshot? scheduleSnapshot;
   final List<TournamentCourt>? courts;
+  final int matchCount;
 
   bool get canStart => blockers.isEmpty && !schedulePending && !courtsPending;
 }
@@ -345,6 +473,7 @@ _TournamentLaunchState _deriveLaunchState({
   required Tournament tournament,
   required AsyncValue<TournamentCategoryScheduleSnapshot> schedule,
   required AsyncValue<List<TournamentCourt>> courts,
+  required AsyncValue<List<TournamentMatch>> matches,
 }) {
   final scheduleSnapshot = schedule.asData?.value;
   final readyCategories = scheduleSnapshot == null
@@ -362,6 +491,7 @@ _TournamentLaunchState _deriveLaunchState({
           .where((court) => court.isAvailable)
           .length ??
       tournament.activeCourtCount;
+  final matchCount = matches.asData?.value.length ?? 0;
 
   final blockers = <String>[];
   if (readyCategories == 0 || playableMatches == 0) {
@@ -382,6 +512,7 @@ _TournamentLaunchState _deriveLaunchState({
     blockers: blockers,
     scheduleSnapshot: scheduleSnapshot,
     courts: courts.asData?.value,
+    matchCount: matchCount,
   );
 }
 
