@@ -8,7 +8,9 @@ import '../data/tournament_providers.dart';
 import '../domain/tournament.dart';
 
 final class TournamentWorkspacePanel extends ConsumerStatefulWidget {
-  const TournamentWorkspacePanel({super.key});
+  const TournamentWorkspacePanel({required this.tournaments, super.key});
+
+  final AsyncValue<List<Tournament>> tournaments;
 
   @override
   ConsumerState<TournamentWorkspacePanel> createState() =>
@@ -75,7 +77,6 @@ class _TournamentWorkspacePanelState
 
   @override
   Widget build(BuildContext context) {
-    final tournaments = ref.watch(ownedTournamentsProvider);
     final theme = Theme.of(context);
 
     return Container(
@@ -152,7 +153,9 @@ class _TournamentWorkspacePanelState
             },
           ),
           const SizedBox(height: AppSpace.lg),
-          tournaments.when(
+          widget.tournaments.when(
+            skipLoadingOnRefresh: true,
+            skipLoadingOnReload: true,
             data: (items) {
               final otherTournaments = items.skip(1).toList(growable: false);
 
@@ -176,12 +179,7 @@ class _TournamentWorkspacePanelState
                 ],
               );
             },
-            loading: () => const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: AppSpace.xl),
-                child: CircularProgressIndicator(),
-              ),
-            ),
+            loading: () => const _TournamentPanelLoadingState(),
             error: (error, _) =>
                 _TournamentErrorState(message: _friendlyError(error)),
           ),
@@ -510,6 +508,20 @@ final class _NoAdditionalTournamentsState extends StatelessWidget {
   Widget build(BuildContext context) {
     return Text(
       'No other tournaments yet.',
+      style: Theme.of(
+        context,
+      ).textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
+    );
+  }
+}
+
+final class _TournamentPanelLoadingState extends StatelessWidget {
+  const _TournamentPanelLoadingState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'Loading tournaments...',
       style: Theme.of(
         context,
       ).textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),

@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../firebase/firebase_status.dart';
 import '../../../theme/app_theme.dart';
+import '../../auth/data/auth_providers.dart';
 import '../../tournaments/data/tournament_providers.dart';
 import '../../tournaments/domain/tournament.dart';
 import '../../tournaments/presentation/tournament_workspace_panel.dart';
@@ -15,6 +16,16 @@ final class DashboardPage extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final tournaments = ref.watch(ownedTournamentsProvider);
+    final hasResolvedAuthSession =
+        ref.watch(firebaseAuthProvider).currentUser != null;
+
+    if (tournaments.isLoading &&
+        !tournaments.hasValue &&
+        !hasResolvedAuthSession) {
+      return const Scaffold(
+        body: SafeArea(child: Center(child: CircularProgressIndicator())),
+      );
+    }
 
     return Scaffold(
       body: SafeArea(
@@ -84,7 +95,7 @@ final class _DashboardContent extends StatelessWidget {
       children: [
         _Header(tournaments: items, isCompact: isCompact),
         SizedBox(height: isCompact ? AppSpace.md : AppSpace.lg),
-        const TournamentWorkspacePanel(),
+        TournamentWorkspacePanel(tournaments: tournaments),
         SizedBox(height: isCompact ? AppSpace.md : AppSpace.lg),
         const _FirebaseNotice(),
       ],

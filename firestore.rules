@@ -7,7 +7,7 @@ service cloud.firestore {
 
     function organizerEmail() {
       return signedIn() && request.auth.token.email is string
-        ? request.auth.token.email
+        ? request.auth.token.email.lower()
         : '';
     }
 

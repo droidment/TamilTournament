@@ -12,56 +12,104 @@ final class TournamentRepository {
   CollectionReference<Map<String, dynamic>> get _tournaments =>
       _firestore.collection('tournaments');
 
+  Future<List<Tournament>> loadOwnedTournaments({
+    required String organizerUid,
+    required String organizerEmail,
+  }) async {
+    final normalizedEmail = _normalizeOrganizerEmail(organizerEmail);
+    QuerySnapshot<Map<String, dynamic>>? directSnapshot;
+    QuerySnapshot<Map<String, dynamic>>? sharedSnapshot;
+
+    try {
+      directSnapshot = await _tournaments
+          .where('organizerUid', isEqualTo: organizerUid)
+          .get();
+    } on FirebaseException catch (error) {
+      if (error.code != 'permission-denied') {
+        rethrow;
+      }
+    }
+
+    if (normalizedEmail.isNotEmpty) {
+      try {
+        sharedSnapshot = await _tournaments
+            .where('organizerEmails', arrayContains: normalizedEmail)
+            .get();
+      } on FirebaseException catch (error) {
+        if (error.code != 'permission-denied') {
+          rethrow;
+        }
+      }
+    }
+
+    final merged =
+        <String, Tournament>{
+            if (directSnapshot != null)
+              for (final doc in directSnapshot.docs)
+              doc.id: Tournament.fromDocument(doc),
+            if (sharedSnapshot != null)
+              for (final doc in sharedSnapshot.docs)
+                doc.id: Tournament.fromDocument(doc),
+          }.values.toList(growable: false)
+          ..sort((left, right) => right.startDate.compareTo(left.startDate));
+
+    return merged;
+  }
+
   Stream<List<Tournament>> watchOwnedTournaments({
     required String organizerUid,
     required String organizerEmail,
   }) {
-    final controller = StreamController<List<Tournament>>();
-    var directTournaments = const <Tournament>[];
-    var sharedTournaments = const <Tournament>[];
-
-    void emit() {
-      final merged =
-          <String, Tournament>{
-              for (final tournament in directTournaments)
-                tournament.id: tournament,
-              for (final tournament in sharedTournaments)
-                tournament.id: tournament,
-            }.values.toList(growable: false)
-            ..sort((left, right) => right.startDate.compareTo(left.startDate));
-      controller.add(merged);
-    }
-
-    final directSubscription = _tournaments
-        .where('organizerUid', isEqualTo: organizerUid)
-        .snapshots()
-        .listen((snapshot) {
-          directTournaments = snapshot.docs
-              .map(Tournament.fromDocument)
-              .toList(growable: false);
-          emit();
-        }, onError: controller.addError);
-
-    StreamSubscription<QuerySnapshot<Map<String, dynamic>>>? sharedSubscription;
     final normalizedEmail = _normalizeOrganizerEmail(organizerEmail);
-    if (normalizedEmail.isNotEmpty) {
-      sharedSubscription = _tournaments
-          .where('organizerEmails', arrayContains: normalizedEmail)
+    return Stream<List<Tournament>>.multi((controller) {
+      var directTournaments = const <Tournament>[];
+      var sharedTournaments = const <Tournament>[];
+
+      void emit() {
+        if (controller.isClosed) {
+          return;
+        }
+
+        final merged =
+            <String, Tournament>{
+                for (final tournament in directTournaments)
+                  tournament.id: tournament,
+                for (final tournament in sharedTournaments)
+                  tournament.id: tournament,
+              }.values.toList(growable: false)
+              ..sort((left, right) => right.startDate.compareTo(left.startDate));
+        controller.add(merged);
+      }
+
+      final directSubscription = _tournaments
+          .where('organizerUid', isEqualTo: organizerUid)
           .snapshots()
           .listen((snapshot) {
-            sharedTournaments = snapshot.docs
+            directTournaments = snapshot.docs
                 .map(Tournament.fromDocument)
                 .toList(growable: false);
             emit();
           }, onError: controller.addError);
-    }
 
-    controller.onCancel = () async {
-      await directSubscription.cancel();
-      await sharedSubscription?.cancel();
-    };
+      StreamSubscription<QuerySnapshot<Map<String, dynamic>>>?
+      sharedSubscription;
+      if (normalizedEmail.isNotEmpty) {
+        sharedSubscription = _tournaments
+            .where('organizerEmails', arrayContains: normalizedEmail)
+            .snapshots()
+            .listen((snapshot) {
+              sharedTournaments = snapshot.docs
+                  .map(Tournament.fromDocument)
+                  .toList(growable: false);
+              emit();
+            }, onError: controller.addError);
+      }
 
-    return controller.stream;
+      controller.onCancel = () async {
+        await directSubscription.cancel();
+        await sharedSubscription?.cancel();
+      };
+    });
   }
 
   Stream<Tournament?> watchTournament({

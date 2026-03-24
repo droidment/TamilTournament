@@ -6,5 +6,8 @@ final firebaseAuthProvider = Provider<FirebaseAuth>((ref) {
 });
 
 final authStateChangesProvider = StreamProvider<User?>((ref) {
-  return ref.watch(firebaseAuthProvider).authStateChanges();
+  return ref
+      .watch(firebaseAuthProvider)
+      .authStateChanges()
+      .distinct((previous, next) => previous?.uid == next?.uid);
 });
