@@ -238,21 +238,37 @@ final class _CategoriesSectionState extends ConsumerState<CategoriesSection> {
                   ],
                 ),
                 SizedBox(height: sectionSpacing),
-                WorkspaceSurfaceCard(
-                  child: Column(
-                    children: [
-                      for (var index = 0; index < items.length; index++) ...[
-                        _CategoryRowCard(category: items[index]),
-                        if (index < items.length - 1)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(
-                              vertical: AppSpace.md,
-                            ),
-                            child: Divider(height: 1),
-                          ),
-                      ],
-                    ],
-                  ),
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final compactList = constraints.maxWidth < 620;
+
+                    return WorkspaceSurfaceCard(
+                      padding: EdgeInsets.symmetric(
+                        horizontal: compactList ? AppSpace.md : AppSpace.lg,
+                        vertical: compactList ? AppSpace.sm : AppSpace.lg,
+                      ),
+                      child: Column(
+                        children: [
+                          for (
+                            var index = 0;
+                            index < items.length;
+                            index++
+                          ) ...[
+                            _CategoryRowCard(category: items[index]),
+                            if (index < items.length - 1)
+                              Padding(
+                                padding: EdgeInsets.symmetric(
+                                  vertical: compactList
+                                      ? AppSpace.sm
+                                      : AppSpace.md,
+                                ),
+                                child: const Divider(height: 1),
+                              ),
+                          ],
+                        ],
+                      ),
+                    );
+                  },
                 ),
               ],
             );
@@ -296,22 +312,24 @@ final class _CategoryRowCard extends StatelessWidget {
     return LayoutBuilder(
       builder: (context, constraints) {
         final isCompact = constraints.maxWidth < 760;
+        final titleStyle =
+            (isCompact
+                    ? theme.textTheme.titleMedium
+                    : theme.textTheme.titleLarge)
+                ?.copyWith(fontWeight: FontWeight.w700);
 
         final details = Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              category.name,
-              style: theme.textTheme.titleLarge?.copyWith(
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+            Text(category.name, style: titleStyle),
             const SizedBox(height: AppSpace.xs),
             Text(
               'Minimum ${category.minPlayers} players',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppPalette.inkSoft,
-              ),
+              style:
+                  (isCompact
+                          ? theme.textTheme.bodySmall
+                          : theme.textTheme.bodyMedium)
+                      ?.copyWith(color: AppPalette.inkSoft),
             ),
           ],
         );
@@ -331,21 +349,42 @@ final class _CategoryRowCard extends StatelessWidget {
             ),
             Text(
               '${category.checkedInPairs} checked in',
-              style: theme.textTheme.bodyMedium?.copyWith(
-                color: AppPalette.inkSoft,
-                fontWeight: FontWeight.w600,
-              ),
+              style:
+                  (isCompact
+                          ? theme.textTheme.bodySmall
+                          : theme.textTheme.bodyMedium)
+                      ?.copyWith(
+                        color: AppPalette.inkSoft,
+                        fontWeight: FontWeight.w600,
+                      ),
             ),
           ],
         );
 
         if (isCompact) {
-          return Column(
+          return Row(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              details,
-              const SizedBox(height: AppSpace.md),
-              rightColumn,
+              Container(
+                width: 4,
+                height: 40,
+                margin: const EdgeInsets.only(top: 2),
+                decoration: BoxDecoration(
+                  color: accent,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+              ),
+              const SizedBox(width: AppSpace.sm),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    details,
+                    const SizedBox(height: AppSpace.sm),
+                    rightColumn,
+                  ],
+                ),
+              ),
             ],
           );
         }

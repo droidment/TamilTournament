@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/presentation/team_identity.dart';
 import '../../../theme/app_theme.dart';
 import '../../categories/domain/category_item.dart';
 import '../../entries/domain/entry.dart';
@@ -39,38 +40,11 @@ final class _SchedulingSeedSectionState
         const WorkspaceSectionLead(
           title: 'Seeding board',
           description:
-              'Start from assigned entry seeds, adjust the live order per category, and save the bracket order for scheduling.',
+              'Adjust the live seed order per category and save it for scheduling.',
           icon: Icons.format_list_numbered_rounded,
           accent: AppPalette.apricot,
         ),
-        const SizedBox(height: AppSpace.lg),
-        if (state.hasValue)
-          WorkspaceStatRail(
-            metrics: [
-              WorkspaceMetricItemData(
-                value: '${state.requireValue.readyCategories.length}',
-                label: 'ready',
-                foreground: const Color(0xFF5F7243),
-                isHighlighted: true,
-              ),
-              WorkspaceMetricItemData(
-                value: '${state.requireValue.totalCheckedInEntries}',
-                label: 'checked in',
-                foreground: const Color(0xFF456F77),
-              ),
-              WorkspaceMetricItemData(
-                value: '${state.requireValue.totalMatchups}',
-                label: 'seed slots',
-                foreground: const Color(0xFF8F6038),
-              ),
-              WorkspaceMetricItemData(
-                value: '${_editedCategoryCount(state.requireValue)}',
-                label: 'edited',
-                foreground: const Color(0xFF7B4D42),
-              ),
-            ],
-          ),
-        if (state.hasValue) const SizedBox(height: AppSpace.lg),
+        const SizedBox(height: AppSpace.md),
         state.when(
           data: (snapshot) {
             _syncLocalDrafts(snapshot);
@@ -111,12 +85,16 @@ final class _SchedulingSeedSectionState
                       FilledButton(
                         onPressed: _isSavingAll
                             ? null
-                            : () => _saveAll(snapshot),
+                            : () async {
+                                FocusManager.instance.primaryFocus?.unfocus();
+                                await Future<void>.delayed(Duration.zero);
+                                await _saveAll(snapshot);
+                              },
                         child: Text(_isSavingAll ? 'Saving...' : 'Save all'),
                       ),
                     ],
                   ),
-                  const SizedBox(height: AppSpace.lg),
+                  const SizedBox(height: AppSpace.md),
                 ],
                 for (
                   var index = 0;
@@ -137,11 +115,12 @@ final class _SchedulingSeedSectionState
                     needsSave: _categoryNeedsSave(
                       snapshot.readyCategories[index],
                     ),
-                    onMoveSeed: (fromIndex, delta) => _moveSeed(
-                      category: snapshot.readyCategories[index],
-                      fromIndex: fromIndex,
-                      delta: delta,
-                    ),
+                    onSetSeedPosition: (fromIndex, seedNumber) =>
+                        _setSeedPosition(
+                          category: snapshot.readyCategories[index],
+                          fromIndex: fromIndex,
+                          requestedSeedNumber: seedNumber,
+                        ),
                     onResetCategory: () =>
                         _resetCategory(snapshot.readyCategories[index]),
                     onAutoSeedCategory: () =>
@@ -276,17 +255,18 @@ final class _SchedulingSeedSectionState
         .toList(growable: false);
   }
 
-  void _moveSeed({
+  void _setSeedPosition({
     required ReadyCategorySeed category,
     required int fromIndex,
-    required int delta,
+    required int requestedSeedNumber,
   }) {
     final seedIds = List<String>.from(_effectiveSeedIds(category));
-    final toIndex = fromIndex + delta;
-    if (fromIndex < 0 ||
-        fromIndex >= seedIds.length ||
-        toIndex < 0 ||
-        toIndex >= seedIds.length) {
+    if (fromIndex < 0 || fromIndex >= seedIds.length) {
+      return;
+    }
+
+    final toIndex = requestedSeedNumber.clamp(1, seedIds.length) - 1;
+    if (toIndex == fromIndex) {
       return;
     }
 
@@ -442,7 +422,7 @@ final class _EditableSeedCategoryCard extends StatelessWidget {
     required this.isEdited,
     required this.isSaving,
     required this.needsSave,
-    required this.onMoveSeed,
+    required this.onSetSeedPosition,
     required this.onResetCategory,
     required this.onAutoSeedCategory,
     required this.onSaveCategory,
@@ -453,7 +433,7 @@ final class _EditableSeedCategoryCard extends StatelessWidget {
   final bool isEdited;
   final bool isSaving;
   final bool needsSave;
-  final void Function(int fromIndex, int delta) onMoveSeed;
+  final void Function(int fromIndex, int seedNumber) onSetSeedPosition;
   final VoidCallback onResetCategory;
   final VoidCallback onAutoSeedCategory;
   final VoidCallback onSaveCategory;
@@ -466,9 +446,32 @@ final class _EditableSeedCategoryCard extends StatelessWidget {
       CategoryFormat.group => AppPalette.sageStrong,
     };
     final matchups = _buildDraftMatchups(orderedEntries);
+    final actionRow = Wrap(
+      spacing: AppSpace.sm,
+      runSpacing: AppSpace.sm,
+      alignment: WrapAlignment.end,
+      children: [
+        OutlinedButton(
+          onPressed: onAutoSeedCategory,
+          child: const Text('Auto-seed'),
+        ),
+        OutlinedButton(onPressed: onResetCategory, child: const Text('Reset')),
+        FilledButton(
+          onPressed: isSaving
+              ? null
+              : () async {
+                  FocusManager.instance.primaryFocus?.unfocus();
+                  await Future<void>.delayed(Duration.zero);
+                  onSaveCategory();
+                },
+          child: Text(isSaving ? 'Saving...' : 'Save'),
+        ),
+      ],
+    );
 
     return WorkspaceSurfaceCard(
       accent: accent,
+      padding: const EdgeInsets.all(AppSpace.md),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -476,6 +479,7 @@ final class _EditableSeedCategoryCard extends StatelessWidget {
             builder: (context, constraints) {
               final isCompact = constraints.maxWidth < 780;
 
+              // ignore: unused_local_variable
               final titleBlock = Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -485,7 +489,7 @@ final class _EditableSeedCategoryCard extends StatelessWidget {
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  const SizedBox(height: AppSpace.xs),
+                  const SizedBox(height: 2),
                   Text(
                     '${category.formatLabel} · ${category.checkedInCount} checked in',
                     style: theme.textTheme.bodyMedium?.copyWith(
@@ -495,64 +499,51 @@ final class _EditableSeedCategoryCard extends StatelessWidget {
                 ],
               );
 
-              final status = Wrap(
-                spacing: AppSpace.sm,
-                runSpacing: AppSpace.sm,
-                alignment: isCompact ? WrapAlignment.start : WrapAlignment.end,
-                children: [
-                  _StatusChip(
-                    label: '${orderedEntries.length} seeds',
-                    tint: AppPalette.oliveSoft,
-                    foreground: const Color(0xFF5F7243),
-                  ),
-                  _StatusChip(
-                    label: category.hasSavedSeedPlan
-                        ? (needsSave ? 'Needs save' : 'Saved')
-                        : 'Generated',
-                    tint: category.hasSavedSeedPlan
-                        ? (needsSave
-                              ? AppPalette.apricotSoft
-                              : AppPalette.sageSoft)
-                        : AppPalette.skySoft,
-                    foreground: category.hasSavedSeedPlan
-                        ? (needsSave
-                              ? const Color(0xFF8F6038)
-                              : const Color(0xFF365141))
-                        : const Color(0xFF456F77),
-                  ),
-                  if (isEdited)
-                    const _StatusChip(
-                      label: 'Edited',
-                      tint: Color(0x24C97D6B),
-                      foreground: Color(0xFF7B4D42),
-                    ),
-                ],
-              );
+              final summaryLabel = [
+                category.formatLabel,
+                '${category.checkedInCount} checked in',
+                '${orderedEntries.length} slots',
+                if (needsSave) 'needs save',
+                if (isEdited) 'edited',
+              ].join(' · ');
 
               if (isCompact) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    titleBlock,
-                    const SizedBox(height: AppSpace.md),
-                    status,
-                  ],
+                return Align(
+                  alignment: Alignment.centerRight,
+                  child: actionRow,
                 );
               }
 
               return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
-                  Expanded(child: titleBlock),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          category.categoryName,
+                          style: theme.textTheme.titleLarge?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          summaryLabel,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: AppPalette.inkSoft,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
                   const SizedBox(width: AppSpace.md),
-                  Flexible(child: status),
+                  Flexible(child: actionRow),
                 ],
               );
             },
           ),
-          const SizedBox(height: AppSpace.lg),
-          Text('Seed order', style: theme.textTheme.titleMedium),
-          const SizedBox(height: AppSpace.sm),
+          const SizedBox(height: AppSpace.md),
           Column(
             children: [
               for (var index = 0; index < orderedEntries.length; index++) ...[
@@ -564,38 +555,17 @@ final class _EditableSeedCategoryCard extends StatelessWidget {
                         orderedEntries[index].id,
                       ) +
                       1,
-                  onMoveUp: index > 0 ? () => onMoveSeed(index, -1) : null,
-                  onMoveDown: index < orderedEntries.length - 1
-                      ? () => onMoveSeed(index, 1)
-                      : null,
+                  onSeedSubmitted: (seedNumber) =>
+                      onSetSeedPosition(index, seedNumber),
                 ),
                 if (index < orderedEntries.length - 1)
                   const SizedBox(height: AppSpace.sm),
               ],
             ],
           ),
-          const SizedBox(height: AppSpace.lg),
-          Wrap(
-            spacing: AppSpace.sm,
-            runSpacing: AppSpace.sm,
-            children: [
-              OutlinedButton(
-                onPressed: onAutoSeedCategory,
-                child: const Text('Auto-seed'),
-              ),
-              OutlinedButton(
-                onPressed: onResetCategory,
-                child: const Text('Reset'),
-              ),
-              FilledButton(
-                onPressed: isSaving ? null : onSaveCategory,
-                child: Text(isSaving ? 'Saving...' : 'Save category'),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppSpace.lg),
+          const SizedBox(height: AppSpace.md),
           Text('Matchup preview', style: theme.textTheme.titleMedium),
-          const SizedBox(height: AppSpace.sm),
+          const SizedBox(height: AppSpace.xs),
           Column(
             children: [
               for (var index = 0; index < matchups.length; index++) ...[
@@ -616,67 +586,56 @@ final class _SeedEntryTile extends StatelessWidget {
     required this.entry,
     required this.currentSeedNumber,
     required this.originalSeedNumber,
-    required this.onMoveUp,
-    required this.onMoveDown,
+    required this.onSeedSubmitted,
   });
 
   final TournamentEntry entry;
   final int currentSeedNumber;
   final int originalSeedNumber;
-  final VoidCallback? onMoveUp;
-  final VoidCallback? onMoveDown;
+  final ValueChanged<int> onSeedSubmitted;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final hasMoved = currentSeedNumber != originalSeedNumber;
+    final palette = TeamIdentity.paletteForEntry(entry);
+    final rowGradient = TeamIdentity.surfaceGradientForEntry(entry);
+    final rowBorder = TeamIdentity.surfaceBorderForEntry(entry);
 
     return Container(
-      padding: const EdgeInsets.all(AppSpace.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.md,
+        vertical: AppSpace.sm,
+      ),
       decoration: BoxDecoration(
-        color: AppPalette.surfaceSoft,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppPalette.line),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: rowGradient,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: rowBorder),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          Container(
-            width: 44,
-            height: 44,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: AppPalette.skySoft,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppPalette.sky.withValues(alpha: 0.35)),
-            ),
-            child: Text(
-              '#$currentSeedNumber',
-              style: AppTheme.numeric(
-                theme.textTheme.labelLarge,
-              ).copyWith(color: const Color(0xFF456F77)),
-            ),
+          _SeedPositionInput(
+            value: currentSeedNumber,
+            accent: palette.accent,
+            onSubmitted: onSeedSubmitted,
           ),
-          const SizedBox(width: AppSpace.md),
+          const SizedBox(width: AppSpace.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_entryLabel(entry), style: theme.textTheme.titleMedium),
-                const SizedBox(height: AppSpace.xs),
                 Text(
-                  hasMoved
-                      ? 'Moved from suggested seed #$originalSeedNumber.'
-                      : entry.hasAssignedSeed
-                      ? 'Suggested by assigned seed #${entry.seedNumber}.'
-                      : 'Suggested by check-in order.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppPalette.inkSoft,
-                  ),
+                  _entryLabel(entry),
+                  style: theme.textTheme.titleMedium?.copyWith(height: 1.15),
                 ),
                 if (entry.teamName.trim().isNotEmpty &&
                     entry.rosterLabel.isNotEmpty) ...[
-                  const SizedBox(height: AppSpace.xs),
+                  const SizedBox(height: 2),
                   Text(
                     entry.rosterLabel,
                     style: theme.textTheme.bodySmall?.copyWith(
@@ -684,11 +643,21 @@ final class _SeedEntryTile extends StatelessWidget {
                     ),
                   ),
                 ],
+                if (hasMoved) ...[
+                  const SizedBox(height: AppSpace.xs),
+                  Text(
+                    'Was #$originalSeedNumber',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: palette.accent,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
-          const SizedBox(width: AppSpace.md),
-          _SeedMoveButtons(onMoveUp: onMoveUp, onMoveDown: onMoveDown),
+          const SizedBox(width: AppSpace.sm),
+          TeamIdentityAvatar(entry: entry, size: 46, radius: 16),
         ],
       ),
     );
@@ -703,24 +672,39 @@ final class _MatchupPreviewTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final rowGradient = TeamIdentity.surfaceGradientForMatch(
+      matchup.teamOne,
+      matchup.teamTwo,
+    );
+    final rowBorder = TeamIdentity.surfaceBorderForMatch(
+      matchup.teamOne,
+      matchup.teamTwo,
+    );
 
     return Container(
-      padding: const EdgeInsets.all(AppSpace.md),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.md,
+        vertical: AppSpace.sm,
+      ),
       decoration: BoxDecoration(
-        color: AppPalette.surfaceSoft,
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: AppPalette.line),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: rowGradient,
+        ),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: rowBorder),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 44,
-            height: 44,
+            width: 38,
+            height: 38,
             alignment: Alignment.center,
             decoration: BoxDecoration(
-              color: AppPalette.oliveSoft,
-              borderRadius: BorderRadius.circular(16),
+              color: Colors.white.withValues(alpha: 0.58),
+              borderRadius: BorderRadius.circular(13),
               border: Border.all(
                 color: AppPalette.oliveStrong.withValues(alpha: 0.35),
               ),
@@ -728,30 +712,59 @@ final class _MatchupPreviewTile extends StatelessWidget {
             child: Text(
               'M${matchup.matchNumber}',
               style: AppTheme.numeric(
-                theme.textTheme.labelMedium,
+                theme.textTheme.labelSmall,
               ).copyWith(color: const Color(0xFF5F7243)),
             ),
           ),
-          const SizedBox(width: AppSpace.md),
+          const SizedBox(width: AppSpace.sm),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  matchup.hasBye
-                      ? '${matchup.teamOne} gets a bye'
-                      : '${matchup.teamOne} vs ${matchup.teamTwo}',
-                  style: theme.textTheme.titleMedium,
+                Row(
+                  children: [
+                    TeamIdentityAvatar(
+                      entry: matchup.teamOne,
+                      size: 24,
+                      radius: 9,
+                    ),
+                    const SizedBox(width: AppSpace.sm),
+                    Expanded(
+                      child: Text(
+                        matchup.teamOne.displayLabel,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(height: AppSpace.xs),
-                Text(
-                  matchup.hasBye
-                      ? 'Awaiting the next checked-in entry to complete the matchup.'
-                      : 'Ready for the live court scheduler.',
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppPalette.inkSoft,
+                if (!matchup.hasBye) ...[
+                  const SizedBox(height: AppSpace.xs),
+                  Row(
+                    children: [
+                      TeamIdentityAvatar(
+                        entry: matchup.teamTwo!,
+                        size: 24,
+                        radius: 9,
+                      ),
+                      const SizedBox(width: AppSpace.sm),
+                      Expanded(
+                        child: Text(
+                          matchup.teamTwo!.displayLabel,
+                          style: theme.textTheme.titleMedium,
+                        ),
+                      ),
+                    ],
                   ),
-                ),
+                ],
+                if (matchup.hasBye) ...[
+                  const SizedBox(height: AppSpace.xs),
+                  Text(
+                    'Waiting for one more team.',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppPalette.inkSoft,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -770,64 +783,109 @@ final class _DraftMatchupPreview {
   });
 
   final int matchNumber;
-  final String teamOne;
-  final String teamTwo;
+  final TournamentEntry teamOne;
+  final TournamentEntry? teamTwo;
   final bool hasBye;
 }
 
-final class _SeedMoveButtons extends StatelessWidget {
-  const _SeedMoveButtons({required this.onMoveUp, required this.onMoveDown});
-
-  final VoidCallback? onMoveUp;
-  final VoidCallback? onMoveDown;
-
-  @override
-  Widget build(BuildContext context) {
-    return Wrap(
-      spacing: AppSpace.xs,
-      children: [
-        _MiniIconButton(
-          tooltip: 'Move seed up',
-          icon: Icons.keyboard_arrow_up_rounded,
-          onPressed: onMoveUp,
-        ),
-        _MiniIconButton(
-          tooltip: 'Move seed down',
-          icon: Icons.keyboard_arrow_down_rounded,
-          onPressed: onMoveDown,
-        ),
-      ],
-    );
-  }
-}
-
-final class _MiniIconButton extends StatelessWidget {
-  const _MiniIconButton({
-    required this.tooltip,
-    required this.icon,
-    required this.onPressed,
+final class _SeedPositionInput extends StatefulWidget {
+  const _SeedPositionInput({
+    required this.value,
+    required this.accent,
+    required this.onSubmitted,
   });
 
-  final String tooltip;
-  final IconData icon;
-  final VoidCallback? onPressed;
+  final int value;
+  final Color accent;
+  final ValueChanged<int> onSubmitted;
+
+  @override
+  State<_SeedPositionInput> createState() => _SeedPositionInputState();
+}
+
+final class _SeedPositionInputState extends State<_SeedPositionInput> {
+  late final TextEditingController _controller;
+  late final FocusNode _focusNode;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = TextEditingController(text: '${widget.value}');
+    _focusNode = FocusNode();
+    _focusNode.addListener(() {
+      if (!_focusNode.hasFocus) {
+        _submit();
+      }
+    });
+  }
+
+  @override
+  void didUpdateWidget(covariant _SeedPositionInput oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.value != widget.value &&
+        _controller.text != '${widget.value}') {
+      _controller.text = '${widget.value}';
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _submit() {
+    final parsed = int.tryParse(_controller.text.trim());
+    if (parsed == null || parsed <= 0) {
+      _controller.text = '${widget.value}';
+      return;
+    }
+    widget.onSubmitted(parsed);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Tooltip(
-      message: tooltip,
-      child: IconButton(
-        onPressed: onPressed,
-        icon: Icon(icon, size: 18),
-        visualDensity: VisualDensity.compact,
-        style: IconButton.styleFrom(
-          backgroundColor: AppPalette.surfaceSoft,
-          foregroundColor: AppPalette.ink,
-          side: const BorderSide(color: AppPalette.line),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(14),
+    return SizedBox(
+      width: 42,
+      child: TextField(
+        controller: _controller,
+        focusNode: _focusNode,
+        keyboardType: TextInputType.number,
+        textInputAction: TextInputAction.done,
+        textAlign: TextAlign.center,
+        onSubmitted: (_) => _submit(),
+        onEditingComplete: () {
+          _submit();
+          _focusNode.unfocus();
+        },
+        onTapOutside: (_) {
+          _submit();
+          _focusNode.unfocus();
+        },
+        onTap: () => _controller.selection = TextSelection(
+          baseOffset: 0,
+          extentOffset: _controller.text.length,
+        ),
+        decoration: InputDecoration(
+          isDense: true,
+          contentPadding: const EdgeInsets.symmetric(vertical: 10),
+          filled: true,
+          fillColor: Colors.white.withValues(alpha: 0.72),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(13),
+            borderSide: BorderSide(
+              color: widget.accent.withValues(alpha: 0.26),
+            ),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(13),
+            borderSide: BorderSide(color: widget.accent, width: 1.2),
           ),
         ),
+        style: AppTheme.numeric(
+          Theme.of(context).textTheme.labelMedium,
+        ).copyWith(color: widget.accent, fontWeight: FontWeight.w700),
       ),
     );
   }
@@ -893,23 +951,6 @@ final class _SeedDraftBanner extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-final class _StatusChip extends StatelessWidget {
-  const _StatusChip({
-    required this.label,
-    required this.tint,
-    required this.foreground,
-  });
-
-  final String label;
-  final Color tint;
-  final Color foreground;
-
-  @override
-  Widget build(BuildContext context) {
-    return WorkspaceTag(label: label, background: tint, foreground: foreground);
   }
 }
 
@@ -1055,10 +1096,10 @@ List<_DraftMatchupPreview> _buildDraftMatchups(
     for (var index = 0; index < orderedEntries.length; index += 2)
       _DraftMatchupPreview(
         matchNumber: (index ~/ 2) + 1,
-        teamOne: _entryLabel(orderedEntries[index]),
+        teamOne: orderedEntries[index],
         teamTwo: index + 1 < orderedEntries.length
-            ? _entryLabel(orderedEntries[index + 1])
-            : 'Bye',
+            ? orderedEntries[index + 1]
+            : null,
         hasBye: index + 1 >= orderedEntries.length,
       ),
   ];

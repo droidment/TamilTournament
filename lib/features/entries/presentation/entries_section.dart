@@ -2,6 +2,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/presentation/team_identity.dart';
 import '../../../theme/app_theme.dart';
 import '../../categories/data/category_providers.dart';
 import '../../categories/domain/category_item.dart';
@@ -23,9 +24,12 @@ final class EntriesSection extends ConsumerStatefulWidget {
   ConsumerState<EntriesSection> createState() => _EntriesSectionState();
 }
 
+enum _EntrySortMode { defaultOrder, uncheckedFirst }
+
 class _EntriesSectionState extends ConsumerState<EntriesSection> {
   bool _isCreating = false;
   Set<String>? _busyEntryIdsState;
+  final _EntrySortMode _sortMode = _EntrySortMode.uncheckedFirst;
 
   Set<String> get _busyEntryIds => _busyEntryIdsState ??= <String>{};
 
@@ -289,6 +293,7 @@ class _EntriesSectionState extends ConsumerState<EntriesSection> {
             final seededCount = items
                 .where((entry) => entry.hasAssignedSeed)
                 .length;
+            final sortedItems = _sortEntries(items);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -313,21 +318,25 @@ class _EntriesSectionState extends ConsumerState<EntriesSection> {
                   ],
                 ),
                 const SizedBox(height: AppSpace.md),
-                for (var index = 0; index < items.length; index++) ...[
+                for (var index = 0; index < sortedItems.length; index++) ...[
                   _EntryRowCard(
-                    entry: items[index],
-                    isBusy: _busyEntryIds.contains(items[index].id),
-                    onToggleCheckedIn: () => _toggleCheckedIn(items[index]),
+                    entry: sortedItems[index],
+                    isBusy: _busyEntryIds.contains(sortedItems[index].id),
+                    onToggleCheckedIn: () =>
+                        _toggleCheckedIn(sortedItems[index]),
                     onEdit: () => _showEditEntryDialog(
-                      entry: items[index],
+                      entry: sortedItems[index],
                       categories: categoryItems,
                       existingEntries: items
-                          .where((candidate) => candidate.id != items[index].id)
+                          .where(
+                            (candidate) =>
+                                candidate.id != sortedItems[index].id,
+                          )
                           .toList(growable: false),
                     ),
-                    onDelete: () => _deleteEntry(items[index]),
+                    onDelete: () => _deleteEntry(sortedItems[index]),
                   ),
-                  if (index < items.length - 1)
+                  if (index < sortedItems.length - 1)
                     const SizedBox(height: AppSpace.md),
                 ],
               ],
@@ -358,6 +367,38 @@ class _EntriesSectionState extends ConsumerState<EntriesSection> {
       ),
       child: content,
     );
+  }
+
+  List<TournamentEntry> _sortEntries(List<TournamentEntry> items) {
+    if (_sortMode == _EntrySortMode.defaultOrder) {
+      return items;
+    }
+
+    final sorted = List<TournamentEntry>.of(items);
+    sorted.sort((a, b) {
+      final checkedCompare = a.checkedIn == b.checkedIn
+          ? 0
+          : (a.checkedIn ? 1 : -1);
+      if (checkedCompare != 0) {
+        return checkedCompare;
+      }
+
+      if (a.hasAssignedSeed != b.hasAssignedSeed) {
+        return a.hasAssignedSeed ? -1 : 1;
+      }
+
+      final seedA = a.seedNumber ?? 9999;
+      final seedB = b.seedNumber ?? 9999;
+      final seedCompare = seedA.compareTo(seedB);
+      if (seedCompare != 0) {
+        return seedCompare;
+      }
+
+      return a.displayLabel.toLowerCase().compareTo(
+        b.displayLabel.toLowerCase(),
+      );
+    });
+    return sorted;
   }
 }
 
@@ -654,7 +695,7 @@ final class _EntryRowCard extends StatelessWidget {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.all(AppSpace.lg),
+            padding: const EdgeInsets.all(AppSpace.md),
             child: LayoutBuilder(
               builder: (context, constraints) {
                 final isCompact = constraints.maxWidth < 760;
@@ -687,16 +728,6 @@ final class _EntryRowCard extends StatelessWidget {
                           label: entry.categoryName,
                           foreground: AppPalette.inkSoft,
                         ),
-                        if (entry.hasAssignedSeed)
-                          _EntryMetaText(
-                            label: 'Seed #${entry.seedNumber}',
-                            foreground: const Color(0xFF8F6038),
-                          ),
-                        _EntryStatusText(
-                          label: entry.checkedIn ? 'Checked in' : 'Waiting',
-                          foreground: AppPalette.ink,
-                          dot: accent,
-                        ),
                       ],
                     ),
                   ],
@@ -724,27 +755,16 @@ final class _EntryRowCard extends StatelessWidget {
 
                 final footer = Container(
                   margin: EdgeInsets.only(
-                    top: isCompact ? AppSpace.md : AppSpace.lg,
+                    top: isCompact ? AppSpace.sm : AppSpace.lg,
                   ),
-                  padding: const EdgeInsets.only(top: AppSpace.md),
+                  padding: EdgeInsets.only(
+                    top: isCompact ? AppSpace.sm : AppSpace.md,
+                  ),
                   decoration: const BoxDecoration(
                     border: Border(top: BorderSide(color: AppPalette.line)),
                   ),
                   child: isCompact
-                      ? Row(
-                          children: [
-                            Expanded(
-                              child: _CheckInControl(
-                                checkedIn: entry.checkedIn,
-                                isBusy: isBusy,
-                                onToggle: onToggleCheckedIn,
-                                compact: true,
-                              ),
-                            ),
-                            const SizedBox(width: AppSpace.sm),
-                            actionRow,
-                          ],
-                        )
+                      ? const SizedBox.shrink()
                       : Row(
                           children: [
                             actionRow,
@@ -768,9 +788,15 @@ final class _EntryRowCard extends StatelessWidget {
                           _TeamAvatar(entry: entry),
                           const SizedBox(width: AppSpace.md),
                           Expanded(child: infoBlock),
+                          const SizedBox(width: AppSpace.sm),
+                          _CompactEntryUtilities(
+                            checkedIn: entry.checkedIn,
+                            isBusy: isBusy,
+                            onToggleCheckedIn: onToggleCheckedIn,
+                            actionRow: actionRow,
+                          ),
                         ],
                       ),
-                      footer,
                     ],
                   );
                 }
@@ -814,39 +840,6 @@ final class _EntryMetaText extends StatelessWidget {
   }
 }
 
-final class _EntryStatusText extends StatelessWidget {
-  const _EntryStatusText({
-    required this.label,
-    required this.foreground,
-    required this.dot,
-  });
-
-  final String label;
-  final Color foreground;
-  final Color dot;
-
-  @override
-  Widget build(BuildContext context) {
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          width: 8,
-          height: 8,
-          decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
-        ),
-        const SizedBox(width: 8),
-        Text(
-          label,
-          style: Theme.of(
-            context,
-          ).textTheme.bodyMedium?.copyWith(color: foreground),
-        ),
-      ],
-    );
-  }
-}
-
 final class _EntryActionLink extends StatelessWidget {
   const _EntryActionLink({
     required this.label,
@@ -875,8 +868,8 @@ final class _EntryActionLink extends StatelessWidget {
           onTap: onTap,
           radius: 20,
           child: Container(
-            width: 34,
-            height: 34,
+            width: 30,
+            height: 30,
             decoration: BoxDecoration(
               color: destructive
                   ? const Color(0x14C97D6B)
@@ -886,7 +879,7 @@ final class _EntryActionLink extends StatelessWidget {
                 color: destructive ? const Color(0x33C97D6B) : AppPalette.line,
               ),
             ),
-            child: Icon(icon, size: 18, color: foreground),
+            child: Icon(icon, size: 16, color: foreground),
           ),
         ),
       );
@@ -910,45 +903,16 @@ final class _CheckInControl extends StatelessWidget {
     required this.checkedIn,
     required this.isBusy,
     required this.onToggle,
-    this.compact = false,
   });
 
   final bool checkedIn;
   final bool isBusy;
   final VoidCallback onToggle;
-  final bool compact;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final label = isBusy
-        ? 'Updating...'
-        : (checkedIn ? 'Checked in' : 'Mark checked in');
-
-    if (compact) {
-      return Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Expanded(
-            child: Text(
-              label,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: checkedIn ? AppPalette.ink : AppPalette.inkSoft,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const SizedBox(width: AppSpace.xs),
-          Checkbox(
-            value: checkedIn,
-            onChanged: isBusy ? null : (_) => onToggle(),
-            visualDensity: VisualDensity.compact,
-          ),
-        ],
-      );
-    }
+    final label = isBusy ? 'Updating...' : 'Arrival';
 
     return Row(
       mainAxisSize: MainAxisSize.min,
@@ -970,6 +934,105 @@ final class _CheckInControl extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
+final class _EntrySortButton extends StatelessWidget {
+  const _EntrySortButton({required this.sortMode, required this.onSelected});
+
+  final _EntrySortMode sortMode;
+  final ValueChanged<_EntrySortMode> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return PopupMenuButton<_EntrySortMode>(
+      tooltip: 'Sort teams',
+      onSelected: onSelected,
+      position: PopupMenuPosition.under,
+      itemBuilder: (context) => const [
+        PopupMenuItem(
+          value: _EntrySortMode.uncheckedFirst,
+          child: Text('Unchecked first'),
+        ),
+        PopupMenuItem(
+          value: _EntrySortMode.defaultOrder,
+          child: Text('Default order'),
+        ),
+      ],
+      child: Container(
+        height: 40,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.sm,
+          vertical: AppSpace.xs,
+        ),
+        decoration: BoxDecoration(
+          color: AppPalette.surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: AppPalette.line),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.sort_rounded, size: 18, color: AppPalette.inkSoft),
+            const SizedBox(width: AppSpace.xs),
+            Text(
+              sortMode == _EntrySortMode.uncheckedFirst
+                  ? 'Unchecked first'
+                  : 'Default order',
+              style: Theme.of(
+                context,
+              ).textTheme.labelMedium?.copyWith(color: AppPalette.inkSoft),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+final class _CompactEntryUtilities extends StatelessWidget {
+  const _CompactEntryUtilities({
+    required this.checkedIn,
+    required this.isBusy,
+    required this.onToggleCheckedIn,
+    required this.actionRow,
+  });
+
+  final bool checkedIn;
+  final bool isBusy;
+  final VoidCallback onToggleCheckedIn;
+  final Widget actionRow;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.end,
+      children: [
+        actionRow,
+        const SizedBox(height: AppSpace.sm),
+        Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              'Arrival',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: checkedIn ? AppPalette.ink : AppPalette.inkSoft,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            const SizedBox(width: AppSpace.xs),
+            Checkbox(
+              value: checkedIn,
+              onChanged: isBusy ? null : (_) => onToggleCheckedIn(),
+              visualDensity: VisualDensity.compact,
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
 final class _TeamAvatar extends StatelessWidget {
   const _TeamAvatar({required this.entry, this.compact = true});
 
@@ -978,148 +1041,11 @@ final class _TeamAvatar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final palette = _TeamAvatarPalette.forSeed(entry.id.hashCode);
-    final size = compact ? 64.0 : 76.0;
-    final playerSize = compact ? 28.0 : 32.0;
-
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [palette.background, palette.backgroundStrong],
-        ),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: palette.border),
-      ),
-      child: Stack(
-        children: [
-          Positioned(
-            left: compact ? 8 : 10,
-            bottom: compact ? 8 : 10,
-            child: _PlayerBadge(
-              size: playerSize,
-              fill: Colors.white.withValues(alpha: 0.84),
-              accent: palette.accent,
-            ),
-          ),
-          Positioned(
-            right: compact ? 8 : 10,
-            top: compact ? 8 : 10,
-            child: _PlayerBadge(
-              size: playerSize,
-              fill: Colors.white.withValues(alpha: 0.74),
-              accent: palette.accentSoft,
-            ),
-          ),
-          Positioned(
-            right: compact ? 6 : 8,
-            bottom: compact ? 8 : 10,
-            child: Transform.rotate(
-              angle: -0.35,
-              child: Icon(
-                Icons.sports_tennis_rounded,
-                size: compact ? 18 : 20,
-                color: palette.accent,
-              ),
-            ),
-          ),
-        ],
-      ),
+    return TeamIdentityAvatar(
+      entry: entry,
+      compact: compact,
+      showSeedNumber: true,
     );
-  }
-}
-
-final class _PlayerBadge extends StatelessWidget {
-  const _PlayerBadge({
-    required this.size,
-    required this.fill,
-    required this.accent,
-  });
-
-  final double size;
-  final Color fill;
-  final Color accent;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: size,
-      height: size,
-      decoration: BoxDecoration(
-        color: fill,
-        shape: BoxShape.circle,
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x160C1511),
-            blurRadius: 8,
-            offset: Offset(0, 3),
-          ),
-        ],
-      ),
-      child: Icon(Icons.person_rounded, size: size * 0.62, color: accent),
-    );
-  }
-}
-
-final class _TeamAvatarPalette {
-  const _TeamAvatarPalette({
-    required this.background,
-    required this.backgroundStrong,
-    required this.border,
-    required this.accent,
-    required this.accentSoft,
-  });
-
-  final Color background;
-  final Color backgroundStrong;
-  final Color border;
-  final Color accent;
-  final Color accentSoft;
-
-  static const List<_TeamAvatarPalette> _palettes = [
-    _TeamAvatarPalette(
-      background: Color(0xFFE7F1EC),
-      backgroundStrong: Color(0xFFD5E7DE),
-      border: Color(0xFFC7DCCF),
-      accent: Color(0xFF4C7267),
-      accentSoft: Color(0xFF729689),
-    ),
-    _TeamAvatarPalette(
-      background: Color(0xFFE7EFF7),
-      backgroundStrong: Color(0xFFD6E4F1),
-      border: Color(0xFFC5D6E6),
-      accent: Color(0xFF486A82),
-      accentSoft: Color(0xFF6F90A6),
-    ),
-    _TeamAvatarPalette(
-      background: Color(0xFFF6ECE5),
-      backgroundStrong: Color(0xFFEEDCCD),
-      border: Color(0xFFE0CCBC),
-      accent: Color(0xFF8B6344),
-      accentSoft: Color(0xFFB08969),
-    ),
-    _TeamAvatarPalette(
-      background: Color(0xFFF1E8EF),
-      backgroundStrong: Color(0xFFE6D7E2),
-      border: Color(0xFFD9C8D3),
-      accent: Color(0xFF7C5E73),
-      accentSoft: Color(0xFFA18397),
-    ),
-    _TeamAvatarPalette(
-      background: Color(0xFFEAF1E3),
-      backgroundStrong: Color(0xFFDCE8D0),
-      border: Color(0xFFCDDCBD),
-      accent: Color(0xFF65764A),
-      accentSoft: Color(0xFF89996B),
-    ),
-  ];
-
-  static _TeamAvatarPalette forSeed(int seed) {
-    final index = seed.abs() % _palettes.length;
-    return _palettes[index];
   }
 }
 

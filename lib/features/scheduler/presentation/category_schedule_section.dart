@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../shared/presentation/team_identity.dart';
 import '../../../theme/app_theme.dart';
 import '../../tournaments/presentation/workspace_components.dart';
 import '../data/category_schedule_providers.dart';
@@ -348,11 +349,53 @@ final class _MatchRow extends StatelessWidget {
           ),
           const SizedBox(width: AppSpace.md),
           Expanded(
-            child: Text(
-              match.hasBye
-                  ? '${match.teamOne.displayLabel} has a bye'
-                  : '${match.teamOne.displayLabel} vs ${match.teamTwo!.displayLabel}',
-              style: theme.textTheme.bodyMedium,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    TeamIdentityAvatar(
+                      entry: match.teamOne,
+                      size: 28,
+                      radius: 10,
+                    ),
+                    const SizedBox(width: AppSpace.sm),
+                    Expanded(
+                      child: Text(
+                        match.teamOne.displayLabel,
+                        style: theme.textTheme.bodyMedium,
+                      ),
+                    ),
+                  ],
+                ),
+                if (match.teamTwo != null) ...[
+                  const SizedBox(height: AppSpace.xs),
+                  Row(
+                    children: [
+                      TeamIdentityAvatar(
+                        entry: match.teamTwo!,
+                        size: 28,
+                        radius: 10,
+                      ),
+                      const SizedBox(width: AppSpace.sm),
+                      Expanded(
+                        child: Text(
+                          match.teamTwo!.displayLabel,
+                          style: theme.textTheme.bodyMedium,
+                        ),
+                      ),
+                    ],
+                  ),
+                ] else ...[
+                  const SizedBox(height: AppSpace.xs),
+                  Text(
+                    'Bye',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppPalette.inkSoft,
+                    ),
+                  ),
+                ],
+              ],
             ),
           ),
         ],

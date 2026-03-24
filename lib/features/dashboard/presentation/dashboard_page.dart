@@ -84,10 +84,6 @@ final class _DashboardContent extends StatelessWidget {
       children: [
         _Header(tournaments: items, isCompact: isCompact),
         SizedBox(height: isCompact ? AppSpace.md : AppSpace.lg),
-        _OverviewRow(tournaments: items, isCompact: isCompact),
-        SizedBox(height: isCompact ? AppSpace.md : AppSpace.lg),
-        _RecentTournamentsPanel(tournaments: tournaments),
-        SizedBox(height: isCompact ? AppSpace.md : AppSpace.lg),
         const TournamentWorkspacePanel(),
         SizedBox(height: isCompact ? AppSpace.md : AppSpace.lg),
         const _FirebaseNotice(),
@@ -105,10 +101,6 @@ final class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final user = FirebaseAuth.instance.currentUser;
-    final displayName = (user?.displayName?.trim().isNotEmpty ?? false)
-        ? user!.displayName!.trim()
-        : user?.email ?? 'Organizer';
     final nextTournament = tournaments.isEmpty ? null : tournaments.first;
 
     return Container(
@@ -122,53 +114,123 @@ final class _Header extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Organizer workspace',
+            nextTournament == null
+                ? 'Organizer workspace'
+                : 'Current tournament',
             style: isCompact
                 ? theme.textTheme.headlineLarge
                 : theme.textTheme.displayMedium,
           ),
-          const SizedBox(height: AppSpace.sm),
-          Text(
-            nextTournament == null
-                ? 'Signed in as $displayName. Create a tournament to start planning categories, entries, and match flow.'
-                : 'Signed in as $displayName. Your latest tournament is ${nextTournament.name} at ${nextTournament.venue} on ${_formatDate(nextTournament.startDate)}.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: AppPalette.inkSoft,
+          if (nextTournament == null) ...[
+            const SizedBox(height: AppSpace.sm),
+            Text(
+              'Create a tournament to start planning categories, entries, and match flow.',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppPalette.inkSoft,
+              ),
             ),
-          ),
-          const SizedBox(height: AppSpace.md),
-          Wrap(
-            spacing: AppSpace.sm,
-            runSpacing: AppSpace.sm,
-            children: [
-              _HeaderChip(
-                label: '${tournaments.length} tournaments',
-                tint: AppPalette.skySoft,
-                border: AppPalette.sky.withValues(alpha: 0.45),
-                foreground: const Color(0xFF456F77),
-              ),
-              _HeaderChip(
-                label:
-                    '${_statusCount(tournaments, TournamentStatus.live)} live',
-                tint: AppPalette.sageSoft,
-                border: AppPalette.sage.withValues(alpha: 0.45),
-                foreground: const Color(0xFF365141),
-              ),
-              _HeaderChip(
-                label:
-                    '${_statusCount(tournaments, TournamentStatus.draft)} drafts',
-                tint: AppPalette.apricotSoft,
-                border: AppPalette.apricot.withValues(alpha: 0.45),
-                foreground: const Color(0xFF8F6038),
-              ),
-            ],
-          ),
+          ],
+          if (nextTournament != null) ...[
+            const SizedBox(height: AppSpace.sm),
+            _CurrentTournamentCard(tournament: nextTournament),
+          ],
         ],
       ),
     );
   }
 }
 
+final class _CurrentTournamentCard extends StatelessWidget {
+  const _CurrentTournamentCard({required this.tournament});
+
+  final Tournament tournament;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final accent = switch (tournament.status) {
+      TournamentStatus.draft => AppPalette.sky,
+      TournamentStatus.setup => AppPalette.apricot,
+      TournamentStatus.live => AppPalette.sageStrong,
+      TournamentStatus.completed => AppPalette.oliveStrong,
+    };
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: () => context.go('/tournaments/${tournament.id}'),
+        child: Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(AppSpace.sm),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                accent.withValues(alpha: 0.16),
+                Colors.white.withValues(alpha: 0.84),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: accent.withValues(alpha: 0.25)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                tournament.name,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '${tournament.venue} · ${_formatDate(tournament.startDate)}',
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppPalette.inkSoft,
+                ),
+              ),
+              const SizedBox(height: AppSpace.sm),
+              Wrap(
+                spacing: AppSpace.sm,
+                runSpacing: AppSpace.sm,
+                children: [
+                  _HeaderChip(
+                    label: tournament.status.label,
+                    tint: accent.withValues(alpha: 0.18),
+                    border: accent.withValues(alpha: 0.4),
+                    foreground: AppPalette.ink,
+                  ),
+                  _HeaderChip(
+                    label: '${tournament.stats.categories} categories',
+                    tint: AppPalette.skySoft,
+                    border: AppPalette.sky.withValues(alpha: 0.35),
+                    foreground: const Color(0xFF456F77),
+                  ),
+                  _HeaderChip(
+                    label: '${tournament.stats.entries} entries',
+                    tint: AppPalette.oliveSoft,
+                    border: AppPalette.oliveStrong.withValues(alpha: 0.35),
+                    foreground: const Color(0xFF5F7243),
+                  ),
+                  _HeaderChip(
+                    label: '${tournament.stats.matches} matches',
+                    tint: AppPalette.apricotSoft,
+                    border: AppPalette.apricot.withValues(alpha: 0.35),
+                    foreground: const Color(0xFF8F6038),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ignore: unused_element
 final class _OverviewRow extends StatelessWidget {
   const _OverviewRow({required this.tournaments, required this.isCompact});
 
@@ -190,110 +252,89 @@ final class _OverviewRow extends StatelessWidget {
       (sum, tournament) => sum + tournament.stats.matches,
     );
 
-    return GridView.count(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      crossAxisCount: isCompact ? 1 : 2,
-      childAspectRatio: isCompact ? 2.2 : 1.85,
-      crossAxisSpacing: AppSpace.md,
-      mainAxisSpacing: AppSpace.md,
+    return Wrap(
+      spacing: AppSpace.sm,
+      runSpacing: AppSpace.sm,
       children: [
-        _MetricCard(
+        _MetricBadge(
           label: 'Tournaments',
           value: '${tournaments.length}',
+          accent: const Color(0xFF376570),
+          tint: AppPalette.skySoft,
           meta: '${_statusCount(tournaments, TournamentStatus.setup)} in setup',
-          accent: AppPalette.sky,
-          wash: const Color(0x268DBEC6),
-          valueColor: const Color(0xFF376570),
         ),
-        _MetricCard(
+        _MetricBadge(
           label: 'Categories',
           value: '$totalCategories',
+          accent: const Color(0xFF486655),
+          tint: AppPalette.sageSoft,
           meta:
               '${_statusCount(tournaments, TournamentStatus.live)} live events',
-          accent: AppPalette.sageStrong,
-          wash: const Color(0x1F98BFA6),
-          valueColor: const Color(0xFF486655),
         ),
-        _MetricCard(
+        _MetricBadge(
           label: 'Entries',
           value: '$totalEntries',
+          accent: const Color(0xFF5F7243),
+          tint: AppPalette.oliveSoft,
           meta: 'Across all owned tournaments',
-          accent: AppPalette.oliveStrong,
-          wash: const Color(0x268FA16F),
-          valueColor: const Color(0xFF5F7243),
         ),
-        _MetricCard(
+        _MetricBadge(
           label: 'Matches',
           value: '$totalMatches',
+          accent: const Color(0xFF8F6038),
+          tint: AppPalette.apricotSoft,
           meta: 'Stored in tournament stats',
-          accent: AppPalette.apricot,
-          wash: const Color(0x2BDDB085),
-          valueColor: const Color(0xFF8F6038),
         ),
       ],
     );
   }
 }
 
-final class _MetricCard extends StatelessWidget {
-  const _MetricCard({
+// ignore: unused_element
+final class _MetricBadge extends StatelessWidget {
+  const _MetricBadge({
     required this.label,
     required this.value,
     required this.meta,
     required this.accent,
-    required this.wash,
-    required this.valueColor,
+    required this.tint,
   });
 
   final String label;
   final String value;
   final String meta;
   final Color accent;
-  final Color wash;
-  final Color valueColor;
+  final Color tint;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
 
     return Container(
-      padding: const EdgeInsets.all(AppSpace.md),
-      decoration: BoxDecoration(
-        color: AppPalette.surface,
-        borderRadius: BorderRadius.circular(AppRadii.panel),
-        border: Border.all(color: AppPalette.line),
-        gradient: LinearGradient(
-          colors: [wash, Colors.transparent],
-          begin: Alignment.topLeft,
-          end: const Alignment(0.9, 0.7),
-        ),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.md,
+        vertical: AppSpace.sm,
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      decoration: BoxDecoration(
+        color: tint,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: accent.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
         children: [
-          Container(height: 4, color: accent),
-          const Spacer(),
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: AppPalette.inkSoft,
-            ),
-          ),
-          const SizedBox(height: AppSpace.sm),
           Text(
             value,
-            style: AppTheme.numeric(theme.textTheme.displaySmall).copyWith(
-              color: valueColor,
-              fontSize: 32,
-              fontWeight: FontWeight.w600,
-            ),
+            style: AppTheme.numeric(
+              theme.textTheme.titleLarge,
+            ).copyWith(color: accent, fontWeight: FontWeight.w700),
           ),
-          const SizedBox(height: AppSpace.sm),
+          const SizedBox(width: AppSpace.sm),
           Text(
-            meta,
+            '$label  ·  $meta',
             style: theme.textTheme.bodySmall?.copyWith(
               color: AppPalette.inkSoft,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ],
@@ -302,6 +343,7 @@ final class _MetricCard extends StatelessWidget {
   }
 }
 
+// ignore: unused_element
 final class _RecentTournamentsPanel extends StatelessWidget {
   const _RecentTournamentsPanel({required this.tournaments});
 
@@ -321,10 +363,10 @@ final class _RecentTournamentsPanel extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Recent tournaments', style: theme.textTheme.headlineMedium),
+          Text('Other tournaments', style: theme.textTheme.headlineMedium),
           const SizedBox(height: AppSpace.xs),
           Text(
-            'Your recent tournaments, ready to open and continue.',
+            'Open another tournament or start a new one.',
             style: theme.textTheme.bodySmall?.copyWith(
               color: AppPalette.inkSoft,
             ),
@@ -332,10 +374,10 @@ final class _RecentTournamentsPanel extends StatelessWidget {
           const SizedBox(height: AppSpace.lg),
           tournaments.when(
             data: (items) {
-              if (items.isEmpty) {
+              final recent = items.skip(1).take(3).toList(growable: false);
+              if (recent.isEmpty) {
                 return const _EmptyRecentTournaments();
               }
-              final recent = items.take(3).toList(growable: false);
               return Column(
                 children: [
                   for (var index = 0; index < recent.length; index++) ...[
@@ -466,10 +508,10 @@ final class _EmptyRecentTournaments extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('No tournaments yet', style: theme.textTheme.titleLarge),
+          Text('No other tournaments yet', style: theme.textTheme.titleLarge),
           const SizedBox(height: AppSpace.sm),
           Text(
-            'Use the workspace below to create your first tournament and start organizing the day.',
+            'Use the tournament list above to create another tournament when you need one.',
             style: theme.textTheme.bodyMedium?.copyWith(
               color: AppPalette.inkSoft,
             ),
@@ -530,12 +572,6 @@ final class _Sidebar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final user = FirebaseAuth.instance.currentUser;
-    final displayName = (user?.displayName?.trim().isNotEmpty ?? false)
-        ? user!.displayName!.trim()
-        : user?.email ?? 'Organizer';
-    final email = user?.email ?? 'Organizer account';
-    final initials = _userInitials(displayName);
     final items = tournaments.maybeWhen(
       data: (value) => value,
       orElse: () => const <Tournament>[],
@@ -555,8 +591,8 @@ final class _Sidebar extends StatelessWidget {
           Row(
             children: [
               Container(
-                width: 44,
-                height: 44,
+                width: 36,
+                height: 36,
                 alignment: Alignment.center,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(AppRadii.control),
@@ -566,7 +602,7 @@ final class _Sidebar extends StatelessWidget {
                     end: Alignment.bottomRight,
                   ),
                 ),
-                child: Text(initials, style: theme.textTheme.labelLarge),
+                child: const Icon(Icons.emoji_events_outlined, size: 18),
               ),
               const SizedBox(width: AppSpace.sm),
               Expanded(
@@ -578,7 +614,7 @@ final class _Sidebar extends StatelessWidget {
                       style: theme.textTheme.titleMedium,
                     ),
                     Text(
-                      'Organizer console',
+                      'Workspace',
                       style: theme.textTheme.bodySmall?.copyWith(
                         color: AppPalette.inkMuted,
                       ),
@@ -586,118 +622,47 @@ final class _Sidebar extends StatelessWidget {
                   ],
                 ),
               ),
-              if (isCompact)
-                IconButton(
-                  onPressed: FirebaseAuth.instance.signOut,
-                  icon: const Icon(Icons.logout_rounded),
-                  tooltip: 'Sign out',
-                ),
+              IconButton(
+                onPressed: FirebaseAuth.instance.signOut,
+                icon: const Icon(Icons.logout_rounded, size: 18),
+                tooltip: 'Sign out',
+                visualDensity: VisualDensity.compact,
+              ),
             ],
           ),
           const SizedBox(height: AppSpace.md),
-          Text(
-            'Live account summary',
-            style: theme.textTheme.labelSmall?.copyWith(
-              color: AppPalette.inkMuted,
-              letterSpacing: 1.2,
-            ),
-          ),
-          const SizedBox(height: AppSpace.sm),
           Wrap(
             spacing: AppSpace.sm,
             runSpacing: AppSpace.sm,
             children: [
-              _SidebarStat(label: 'Owned', value: '${items.length}'),
-              _SidebarStat(
-                label: 'Live',
-                value: '${_statusCount(items, TournamentStatus.live)}',
+              _HeaderChip(
+                label: '${items.length} owned',
+                tint: AppPalette.skySoft,
+                border: AppPalette.sky.withValues(alpha: 0.35),
+                foreground: const Color(0xFF456F77),
               ),
-              _SidebarStat(
-                label: 'Drafts',
-                value: '${_statusCount(items, TournamentStatus.draft)}',
+              _HeaderChip(
+                label: '${_statusCount(items, TournamentStatus.live)} live',
+                tint: AppPalette.sageSoft,
+                border: AppPalette.sage.withValues(alpha: 0.35),
+                foreground: const Color(0xFF365141),
               ),
-              _SidebarStat(
-                label: 'Entries',
-                value:
-                    '${items.fold<int>(0, (sum, tournament) => sum + tournament.stats.entries)}',
+              _HeaderChip(
+                label: '${_statusCount(items, TournamentStatus.draft)} drafts',
+                tint: AppPalette.apricotSoft,
+                border: AppPalette.apricot.withValues(alpha: 0.35),
+                foreground: const Color(0xFF8F6038),
+              ),
+              _HeaderChip(
+                label:
+                    '${items.fold<int>(0, (sum, tournament) => sum + tournament.stats.entries)} entries',
+                tint: AppPalette.oliveSoft,
+                border: AppPalette.oliveStrong.withValues(alpha: 0.35),
+                foreground: const Color(0xFF5F7243),
               ),
             ],
           ),
-          const SizedBox(height: AppSpace.md),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(AppSpace.md),
-            decoration: BoxDecoration(
-              color: AppPalette.surfaceSoft,
-              borderRadius: BorderRadius.circular(AppRadii.panel),
-              border: Border.all(color: AppPalette.line),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(displayName, style: theme.textTheme.labelLarge),
-                const SizedBox(height: 4),
-                Text(
-                  email,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: AppPalette.inkMuted,
-                  ),
-                ),
-                if (!isCompact) ...[
-                  const SizedBox(height: AppSpace.md),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: FirebaseAuth.instance.signOut,
-                      child: const Text('Sign out'),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-final class _SidebarStat extends StatelessWidget {
-  const _SidebarStat({required this.label, required this.value});
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      constraints: const BoxConstraints(minWidth: 120),
-      padding: const EdgeInsets.symmetric(
-        horizontal: AppSpace.md,
-        vertical: AppSpace.sm,
-      ),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(AppRadii.panel),
-        color: AppPalette.surfaceSoft,
-        border: Border.all(color: AppPalette.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            label,
-            style: theme.textTheme.bodySmall?.copyWith(
-              color: AppPalette.inkSoft,
-            ),
-          ),
-          const SizedBox(height: AppSpace.xs),
-          Text(
-            value,
-            style: AppTheme.numeric(
-              theme.textTheme.titleMedium,
-            ).copyWith(color: AppPalette.ink),
-          ),
+          if (!isCompact) const Spacer(),
         ],
       ),
     );
@@ -720,10 +685,10 @@ final class _HeaderChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: tint,
-        borderRadius: BorderRadius.circular(AppRadii.chip),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: border),
       ),
       child: Text(
@@ -787,20 +752,6 @@ String _friendlyError(Object error) {
 
 int _statusCount(List<Tournament> tournaments, TournamentStatus status) {
   return tournaments.where((tournament) => tournament.status == status).length;
-}
-
-String _userInitials(String value) {
-  final parts = value
-      .split(RegExp(r'\s+'))
-      .where((part) => part.isNotEmpty)
-      .take(2)
-      .toList();
-
-  if (parts.isEmpty) {
-    return 'TT';
-  }
-
-  return parts.map((part) => part.substring(0, 1).toUpperCase()).join();
 }
 
 String _formatDate(DateTime value) {

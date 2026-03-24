@@ -96,12 +96,12 @@ class _TournamentWorkspacePanelState
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          'Tournament workspace',
+                          'More tournaments',
                           style: theme.textTheme.headlineMedium,
                         ),
                         const SizedBox(height: AppSpace.xs),
                         Text(
-                          'Create a tournament, set the venue, and start building the event workspace.',
+                          'Open a tournament or create a new one.',
                           style: theme.textTheme.bodySmall?.copyWith(
                             color: AppPalette.inkSoft,
                           ),
@@ -114,12 +114,12 @@ class _TournamentWorkspacePanelState
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            'Tournament workspace',
+                            'More tournaments',
                             style: theme.textTheme.headlineMedium,
                           ),
                           const SizedBox(height: AppSpace.xs),
                           Text(
-                            'Create a tournament, set the venue, and start building the event workspace.',
+                            'Open a tournament or create a new one.',
                             style: theme.textTheme.bodySmall?.copyWith(
                               color: AppPalette.inkSoft,
                             ),
@@ -149,14 +149,23 @@ class _TournamentWorkspacePanelState
           const SizedBox(height: AppSpace.lg),
           tournaments.when(
             data: (items) {
+              final otherTournaments = items.skip(1).toList(growable: false);
+
               if (items.isEmpty) {
                 return const _TournamentEmptyState();
               }
+              if (otherTournaments.isEmpty) {
+                return const _NoAdditionalTournamentsState();
+              }
               return Column(
                 children: [
-                  for (var index = 0; index < items.length; index++) ...[
-                    _TournamentRowCard(tournament: items[index]),
-                    if (index < items.length - 1)
+                  for (
+                    var index = 0;
+                    index < otherTournaments.length;
+                    index++
+                  ) ...[
+                    _TournamentRowCard(tournament: otherTournaments[index]),
+                    if (index < otherTournaments.length - 1)
                       const SizedBox(height: AppSpace.md),
                   ],
                 ],
@@ -442,10 +451,10 @@ final class _WorkspaceChip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: tint,
-        borderRadius: BorderRadius.circular(AppRadii.chip),
+        borderRadius: BorderRadius.circular(10),
         border: Border.all(color: border),
       ),
       child: Text(
@@ -485,6 +494,20 @@ final class _TournamentEmptyState extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+final class _NoAdditionalTournamentsState extends StatelessWidget {
+  const _NoAdditionalTournamentsState();
+
+  @override
+  Widget build(BuildContext context) {
+    return Text(
+      'No other tournaments yet.',
+      style: Theme.of(
+        context,
+      ).textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
     );
   }
 }
