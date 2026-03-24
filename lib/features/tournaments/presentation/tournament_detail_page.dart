@@ -70,12 +70,28 @@ final class TournamentDetailPage extends ConsumerStatefulWidget {
 final class _TournamentDetailPageState
     extends ConsumerState<TournamentDetailPage> {
   _TournamentWorkspaceTab _selectedTab = _TournamentWorkspaceTab.setup;
+  late final ScrollController _workspaceScrollController;
+
+  @override
+  void initState() {
+    super.initState();
+    _workspaceScrollController = ScrollController();
+  }
+
+  @override
+  void dispose() {
+    _workspaceScrollController.dispose();
+    super.dispose();
+  }
 
   @override
   void didUpdateWidget(covariant TournamentDetailPage oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.tournamentId != widget.tournamentId) {
       _selectedTab = _TournamentWorkspaceTab.setup;
+      if (_workspaceScrollController.hasClients) {
+        _workspaceScrollController.jumpTo(0);
+      }
     }
   }
 
@@ -99,10 +115,19 @@ final class _TournamentDetailPageState
               return _TournamentDetailBody(
                 tournament: value,
                 selectedTab: _selectedTab,
-                onSelectTab: (tab) {
+                scrollController: _workspaceScrollController,
+                onSelectTab: (tab) async {
                   setState(() {
                     _selectedTab = tab;
                   });
+                  if (_workspaceScrollController.hasClients &&
+                      _workspaceScrollController.offset > 0) {
+                    await _workspaceScrollController.animateTo(
+                      0,
+                      duration: const Duration(milliseconds: 220),
+                      curve: Curves.easeOutCubic,
+                    );
+                  }
                 },
               );
             },
@@ -122,11 +147,13 @@ final class _TournamentDetailBody extends StatelessWidget {
   const _TournamentDetailBody({
     required this.tournament,
     required this.selectedTab,
+    required this.scrollController,
     required this.onSelectTab,
   });
 
   final Tournament tournament;
   final _TournamentWorkspaceTab selectedTab;
+  final ScrollController scrollController;
   final ValueChanged<_TournamentWorkspaceTab> onSelectTab;
 
   static const _allTabs = <_TournamentWorkspaceTab>[
@@ -139,53 +166,68 @@ final class _TournamentDetailBody extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final isCompact = constraints.maxWidth < 1240;
+    return AnimatedBuilder(
+      animation: scrollController,
+      builder: (context, _) {
+        final collapseProgress = scrollController.hasClients
+            ? (scrollController.offset / 92).clamp(0.0, 1.0)
+            : 0.0;
 
-        return Column(
-          children: [
-            _TournamentHero(tournament: tournament, selectedTab: selectedTab),
-            const SizedBox(height: AppSpace.lg),
-            if (isCompact) ...[
-              _CompactWorkspaceTabs(
-                tournament: tournament,
-                selectedTab: selectedTab,
-                onSelectTab: onSelectTab,
-                tabs: _allTabs,
-              ),
-              const SizedBox(height: AppSpace.lg),
-              Expanded(
-                child: _WorkspaceContent(
-                  tab: selectedTab,
+        return LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 1240;
+
+            return Column(
+              children: [
+                _TournamentHero(
                   tournament: tournament,
+                  selectedTab: selectedTab,
+                  collapseProgress: collapseProgress,
                 ),
-              ),
-            ] else
-              Expanded(
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: 280,
-                      child: _WorkspaceSidebar(
-                        tournament: tournament,
-                        selectedTab: selectedTab,
-                        onSelectTab: onSelectTab,
-                        tabs: _allTabs,
-                      ),
+                SizedBox(height: _spaceBetween(18, 10, collapseProgress)),
+                if (isCompact) ...[
+                  _CompactWorkspaceTabs(
+                    selectedTab: selectedTab,
+                    onSelectTab: onSelectTab,
+                    tabs: _allTabs,
+                    collapseProgress: collapseProgress,
+                  ),
+                  SizedBox(height: _spaceBetween(18, 10, collapseProgress)),
+                  Expanded(
+                    child: _WorkspaceContent(
+                      tab: selectedTab,
+                      tournament: tournament,
+                      scrollController: scrollController,
                     ),
-                    const SizedBox(width: AppSpace.lg),
-                    Expanded(
-                      child: _WorkspaceContent(
-                        tab: selectedTab,
-                        tournament: tournament,
-                      ),
+                  ),
+                ] else
+                  Expanded(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        SizedBox(
+                          width: 280,
+                          child: _WorkspaceSidebar(
+                            tournament: tournament,
+                            selectedTab: selectedTab,
+                            onSelectTab: onSelectTab,
+                            tabs: _allTabs,
+                          ),
+                        ),
+                        const SizedBox(width: AppSpace.lg),
+                        Expanded(
+                          child: _WorkspaceContent(
+                            tab: selectedTab,
+                            tournament: tournament,
+                            scrollController: scrollController,
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-          ],
+                  ),
+              ],
+            );
+          },
         );
       },
     );
@@ -193,112 +235,103 @@ final class _TournamentDetailBody extends StatelessWidget {
 }
 
 final class _TournamentHero extends StatelessWidget {
-  const _TournamentHero({required this.tournament, required this.selectedTab});
+  const _TournamentHero({
+    required this.tournament,
+    required this.selectedTab,
+    required this.collapseProgress,
+  });
 
   final Tournament tournament;
   final _TournamentWorkspaceTab selectedTab;
+  final double collapseProgress;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final expandedOpacity = 1 - collapseProgress;
+    final collapsedTitleOpacity = collapseProgress;
 
     return Container(
-      padding: const EdgeInsets.all(AppSpace.xl),
+      padding: const EdgeInsets.symmetric(horizontal: AppSpace.md, vertical: 8),
       decoration: BoxDecoration(
         color: AppPalette.surface,
         borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: AppPalette.line),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: <Color>[AppPalette.surface, Color(0xFFF7F3EB)],
-        ),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x120F1412),
-            blurRadius: 28,
-            offset: Offset(0, 18),
-          ),
-        ],
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Wrap(
-            spacing: AppSpace.sm,
-            runSpacing: AppSpace.sm,
-            crossAxisAlignment: WrapCrossAlignment.center,
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final metaLine =
+              '${tournament.venue} · ${_formatDate(tournament.startDate)}';
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              OutlinedButton.icon(
-                onPressed: () => context.go('/'),
-                icon: const Icon(Icons.arrow_back_rounded),
-                label: const Text('Back'),
+              Row(
+                children: [
+                  TextButton.icon(
+                    onPressed: () => context.go('/'),
+                    icon: const Icon(Icons.arrow_back_rounded),
+                    label: const Text('Back'),
+                  ),
+                  const SizedBox(width: AppSpace.sm),
+                  Expanded(
+                    child: Opacity(
+                      opacity: collapsedTitleOpacity,
+                      child: Text(
+                        tournament.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: theme.textTheme.titleMedium,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: AppSpace.sm),
+                  _HeaderChip(
+                    label: tournament.status.label,
+                    tint: AppPalette.skySoft,
+                    border: AppPalette.sky.withValues(alpha: 0.45),
+                    foreground: const Color(0xFF456F77),
+                  ),
+                  _HeaderChip(
+                    label: selectedTab.label,
+                    tint: selectedTab.accent.withValues(alpha: 0.14),
+                    border: selectedTab.accent.withValues(alpha: 0.32),
+                    foreground: AppPalette.ink,
+                  ),
+                ],
               ),
-              _HeaderChip(
-                label: tournament.status.label,
-                tint: AppPalette.skySoft,
-                border: AppPalette.sky.withValues(alpha: 0.45),
-                foreground: const Color(0xFF456F77),
-              ),
-              _HeaderChip(
-                label: selectedTab.label,
-                tint: selectedTab.accent.withValues(alpha: 0.14),
-                border: selectedTab.accent.withValues(alpha: 0.32),
-                foreground: AppPalette.ink,
+              ClipRect(
+                child: Align(
+                  heightFactor: expandedOpacity,
+                  alignment: Alignment.topLeft,
+                  child: Opacity(
+                    opacity: expandedOpacity,
+                    child: Padding(
+                      padding: EdgeInsets.only(
+                        top: _spaceBetween(8, 0, collapseProgress),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            tournament.name,
+                            style: theme.textTheme.titleMedium,
+                          ),
+                          const SizedBox(height: AppSpace.xs),
+                          Text(
+                            metaLine,
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppPalette.inkSoft,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
               ),
             ],
-          ),
-          const SizedBox(height: AppSpace.lg),
-          Text(tournament.name, style: theme.textTheme.displayMedium),
-          const SizedBox(height: AppSpace.sm),
-          Text(
-            '${tournament.venue} · ${_formatDate(tournament.startDate)}',
-            style: theme.textTheme.bodyLarge?.copyWith(
-              color: AppPalette.inkSoft,
-            ),
-          ),
-          const SizedBox(height: AppSpace.md),
-          ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 720),
-            child: Text(
-              selectedTab.subtitle,
-              style: theme.textTheme.titleMedium?.copyWith(
-                color: AppPalette.inkSoft,
-              ),
-            ),
-          ),
-          const SizedBox(height: AppSpace.lg),
-          Wrap(
-            spacing: AppSpace.sm,
-            runSpacing: AppSpace.sm,
-            children: [
-              _HeaderChip(
-                label: '${tournament.stats.categories} categories',
-                tint: AppPalette.skySoft,
-                border: AppPalette.sky.withValues(alpha: 0.45),
-                foreground: const Color(0xFF456F77),
-              ),
-              _HeaderChip(
-                label: '${tournament.stats.entries} entries',
-                tint: AppPalette.oliveSoft,
-                border: AppPalette.oliveStrong.withValues(alpha: 0.45),
-                foreground: const Color(0xFF5F7243),
-              ),
-              _HeaderChip(
-                label: '${tournament.stats.matches} matches',
-                tint: AppPalette.apricotSoft,
-                border: AppPalette.apricot.withValues(alpha: 0.45),
-                foreground: const Color(0xFF8F6038),
-              ),
-              _HeaderChip(
-                label: '${tournament.activeCourtCount} active courts',
-                tint: AppPalette.sageSoft,
-                border: AppPalette.sage.withValues(alpha: 0.45),
-                foreground: const Color(0xFF365141),
-              ),
-            ],
-          ),
-        ],
+          );
+        },
       ),
     );
   }
@@ -306,38 +339,41 @@ final class _TournamentHero extends StatelessWidget {
 
 final class _CompactWorkspaceTabs extends StatelessWidget {
   const _CompactWorkspaceTabs({
-    required this.tournament,
     required this.selectedTab,
     required this.onSelectTab,
     required this.tabs,
+    required this.collapseProgress,
   });
 
-  final Tournament tournament;
   final _TournamentWorkspaceTab selectedTab;
   final ValueChanged<_TournamentWorkspaceTab> onSelectTab;
   final List<_TournamentWorkspaceTab> tabs;
+  final double collapseProgress;
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(AppSpace.md),
+      padding: EdgeInsets.all(_spaceBetween(8, 6, collapseProgress)),
       decoration: BoxDecoration(
         color: AppPalette.surface,
         borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: AppPalette.line),
       ),
-      child: Wrap(
-        spacing: AppSpace.sm,
-        runSpacing: AppSpace.sm,
-        children: [
-          for (final tab in tabs)
-            _WorkspacePill(
-              tab: tab,
-              tournament: tournament,
-              isSelected: selectedTab == tab,
-              onTap: () => onSelectTab(tab),
-            ),
-        ],
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            for (var index = 0; index < tabs.length; index++) ...[
+              _WorkspacePill(
+                tab: tabs[index],
+                isSelected: selectedTab == tabs[index],
+                onTap: () => onSelectTab(tabs[index]),
+                collapseProgress: collapseProgress,
+              ),
+              if (index < tabs.length - 1) const SizedBox(width: AppSpace.sm),
+            ],
+          ],
+        ),
       ),
     );
   }
@@ -399,15 +435,15 @@ final class _WorkspaceSidebar extends StatelessWidget {
 final class _WorkspacePill extends StatelessWidget {
   const _WorkspacePill({
     required this.tab,
-    required this.tournament,
     required this.isSelected,
     required this.onTap,
+    required this.collapseProgress,
   });
 
   final _TournamentWorkspaceTab tab;
-  final Tournament tournament;
   final bool isSelected;
   final VoidCallback onTap;
+  final double collapseProgress;
 
   @override
   Widget build(BuildContext context) {
@@ -421,18 +457,18 @@ final class _WorkspacePill extends StatelessWidget {
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: BorderRadius.circular(18),
         onTap: onTap,
         child: AnimatedContainer(
           duration: const Duration(milliseconds: 180),
           curve: Curves.easeOutCubic,
-          padding: const EdgeInsets.symmetric(
+          padding: EdgeInsets.symmetric(
             horizontal: AppSpace.md,
-            vertical: AppSpace.md,
+            vertical: _spaceBetween(10, 8, collapseProgress),
           ),
           decoration: BoxDecoration(
             color: tint,
-            borderRadius: BorderRadius.circular(22),
+            borderRadius: BorderRadius.circular(18),
             border: Border.all(color: border),
           ),
           child: Row(
@@ -444,21 +480,7 @@ final class _WorkspacePill extends StatelessWidget {
                 color: isSelected ? AppPalette.ink : AppPalette.inkSoft,
               ),
               const SizedBox(width: AppSpace.sm),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    tab.label,
-                    style: Theme.of(context).textTheme.labelLarge,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    tab.metric(tournament),
-                    style: Theme.of(context).textTheme.bodySmall,
-                  ),
-                ],
-              ),
+              Text(tab.label, style: Theme.of(context).textTheme.labelLarge),
             ],
           ),
         ),
@@ -559,10 +581,15 @@ final class _WorkspaceNavTile extends StatelessWidget {
 }
 
 final class _WorkspaceContent extends StatelessWidget {
-  const _WorkspaceContent({required this.tab, required this.tournament});
+  const _WorkspaceContent({
+    required this.tab,
+    required this.tournament,
+    required this.scrollController,
+  });
 
   final _TournamentWorkspaceTab tab;
   final Tournament tournament;
+  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context) {
@@ -572,65 +599,8 @@ final class _WorkspaceContent extends StatelessWidget {
       switchOutCurve: Curves.easeOutCubic,
       child: SingleChildScrollView(
         key: ValueKey(tab),
-        child: Column(
-          children: [
-            _WorkspaceSectionBanner(tab: tab),
-            const SizedBox(height: AppSpace.lg),
-            _WorkspaceSection(tab: tab, tournament: tournament),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-final class _WorkspaceSectionBanner extends StatelessWidget {
-  const _WorkspaceSectionBanner({required this.tab});
-
-  final _TournamentWorkspaceTab tab;
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpace.lg),
-      decoration: BoxDecoration(
-        color: tab.accent.withValues(alpha: 0.12),
-        borderRadius: BorderRadius.circular(AppRadii.panel),
-        border: Border.all(color: tab.accent.withValues(alpha: 0.28)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: tab.accent.withValues(alpha: 0.24)),
-            ),
-            child: Icon(tab.icon, color: AppPalette.ink),
-          ),
-          const SizedBox(width: AppSpace.md),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(tab.label, style: theme.textTheme.headlineMedium),
-                const SizedBox(height: AppSpace.xs),
-                Text(
-                  tab.subtitle,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppPalette.inkSoft,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
+        controller: scrollController,
+        child: _WorkspaceSection(tab: tab, tournament: tournament),
       ),
     );
   }
@@ -750,4 +720,8 @@ String _formatDate(DateTime value) {
     'Dec',
   ];
   return '${months[value.month - 1]} ${value.day}, ${value.year}';
+}
+
+double _spaceBetween(double start, double end, double progress) {
+  return start + ((end - start) * progress);
 }
