@@ -60,6 +60,7 @@ final class Tournament {
     required this.venue,
     required this.startDate,
     required this.organizerUid,
+    required this.organizerEmails,
     required this.status,
     required this.activeCourtCount,
     required this.stats,
@@ -72,6 +73,7 @@ final class Tournament {
   final String venue;
   final DateTime startDate;
   final String organizerUid;
+  final List<String> organizerEmails;
   final TournamentStatus status;
   final int activeCourtCount;
   final TournamentStats stats;
@@ -90,6 +92,11 @@ final class Tournament {
           : 'Venue TBD',
       startDate: (data['startDate'] as Timestamp?)?.toDate() ?? DateTime.now(),
       organizerUid: data['organizerUid'] as String? ?? '',
+      organizerEmails: List<String>.unmodifiable(
+        (data['organizerEmails'] as List<dynamic>? ?? const <dynamic>[])
+            .map((value) => value.toString().trim())
+            .where((value) => value.isNotEmpty),
+      ),
       status: TournamentStatusX.fromValue(
         data['status'] as String? ?? TournamentStatus.draft.value,
       ),

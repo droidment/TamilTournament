@@ -10,6 +10,7 @@ import '../../scheduler/presentation/scheduling_seed_section.dart';
 import '../data/tournament_providers.dart';
 import '../domain/tournament.dart';
 import 'categories_section.dart';
+import 'organizers_section.dart';
 import 'workspace_components.dart';
 
 enum _TournamentWorkspaceTab { setup, teams, seeding, schedule, courts }
@@ -1420,9 +1421,13 @@ final class _WorkspaceSection extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return switch (tab) {
-      _TournamentWorkspaceTab.setup => CategoriesSection(
-        tournamentId: tournament.id,
-        embedded: true,
+      _TournamentWorkspaceTab.setup => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          OrganizersSection(tournament: tournament, embedded: true),
+          const SizedBox(height: AppSpace.xl),
+          CategoriesSection(tournamentId: tournament.id, embedded: true),
+        ],
       ),
       _TournamentWorkspaceTab.teams => EntriesSection(
         tournamentId: tournament.id,

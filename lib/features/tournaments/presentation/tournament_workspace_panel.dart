@@ -38,10 +38,15 @@ class _TournamentWorkspacePanelState
       if (user == null) {
         throw StateError('You must be signed in to create a tournament.');
       }
+      final organizerEmail = user.email?.trim();
+      if (organizerEmail == null || organizerEmail.isEmpty) {
+        throw StateError('This Google account does not have a usable email.');
+      }
       await ref
           .read(tournamentRepositoryProvider)
           .createDraftTournament(
             organizerUid: user.uid,
+            organizerEmail: organizerEmail,
             name: draft.name,
             venue: draft.venue,
             startDate: draft.startDate,

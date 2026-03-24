@@ -16,12 +16,13 @@ final tournamentRepositoryProvider = Provider<TournamentRepository>((ref) {
 final ownedTournamentsProvider = StreamProvider<List<Tournament>>((ref) {
   final authState = ref.watch(authStateChangesProvider);
   final user = authState.value;
-  if (user == null) {
+  final email = user?.email;
+  if (user == null || email == null || email.trim().isEmpty) {
     return Stream.value(const <Tournament>[]);
   }
   return ref
       .watch(tournamentRepositoryProvider)
-      .watchOwnedTournaments(user.uid);
+      .watchOwnedTournaments(organizerUid: user.uid, organizerEmail: email);
 });
 
 final tournamentByIdProvider = StreamProvider.family<Tournament?, String>((
@@ -30,10 +31,15 @@ final tournamentByIdProvider = StreamProvider.family<Tournament?, String>((
 ) {
   final authState = ref.watch(authStateChangesProvider);
   final user = authState.value;
-  if (user == null) {
+  final email = user?.email;
+  if (user == null || email == null || email.trim().isEmpty) {
     return Stream.value(null);
   }
   return ref
       .watch(tournamentRepositoryProvider)
-      .watchTournament(tournamentId: tournamentId, organizerUid: user.uid);
+      .watchTournament(
+        tournamentId: tournamentId,
+        organizerUid: user.uid,
+        organizerEmail: email,
+      );
 });

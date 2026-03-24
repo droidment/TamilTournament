@@ -288,7 +288,60 @@ final class _SchedulingSeedSectionState
     );
   }
 
-  void _autoSeedCategory(ReadyCategorySeed category) {
+  Future<void> _autoSeedCategory(ReadyCategorySeed category) async {
+    final shouldProceed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppPalette.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.panel),
+          side: const BorderSide(color: AppPalette.line),
+        ),
+        title: const Text('Replace this seeding?'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Auto-seed will replace the current order for ${category.categoryName}.',
+            ),
+            const SizedBox(height: AppSpace.sm),
+            Text(
+              'This can reshuffle manual seeds, change the matchup preview, and disrupt any schedule that depends on this order after you save.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppPalette.inkSoft),
+            ),
+            if (category.hasSavedSeedPlan || _isCategoryEdited(category)) ...[
+              const SizedBox(height: AppSpace.sm),
+              Text(
+                'Use this only when you want to discard the current manual arrangement.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF8F6038),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Replace order'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldProceed != true || !mounted) {
+      return;
+    }
+
     final suggested = category.suggestedSeedEntryIds;
     setState(() {
       _draftSeedIdsByCategory[category.categoryId] = suggested;
@@ -847,45 +900,75 @@ final class _SeedPositionInputState extends State<_SeedPositionInput> {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 42,
-      child: TextField(
-        controller: _controller,
-        focusNode: _focusNode,
-        keyboardType: TextInputType.number,
-        textInputAction: TextInputAction.done,
-        textAlign: TextAlign.center,
-        onSubmitted: (_) => _submit(),
-        onEditingComplete: () {
-          _submit();
-          _focusNode.unfocus();
-        },
-        onTapOutside: (_) {
-          _submit();
-          _focusNode.unfocus();
-        },
-        onTap: () => _controller.selection = TextSelection(
-          baseOffset: 0,
-          extentOffset: _controller.text.length,
-        ),
-        decoration: InputDecoration(
-          isDense: true,
-          contentPadding: const EdgeInsets.symmetric(vertical: 10),
-          filled: true,
-          fillColor: Colors.white.withValues(alpha: 0.72),
-          enabledBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(13),
-            borderSide: BorderSide(
-              color: widget.accent.withValues(alpha: 0.26),
+      width: 74,
+      child: Row(
+        children: [
+          Expanded(
+            child: TextField(
+              controller: _controller,
+              focusNode: _focusNode,
+              keyboardType: TextInputType.number,
+              textInputAction: TextInputAction.done,
+              textAlign: TextAlign.center,
+              onSubmitted: (_) => _submit(),
+              onEditingComplete: () {
+                _submit();
+                _focusNode.unfocus();
+              },
+              onTapOutside: (_) {
+                _submit();
+                _focusNode.unfocus();
+              },
+              onTap: () => _controller.selection = TextSelection(
+                baseOffset: 0,
+                extentOffset: _controller.text.length,
+              ),
+              decoration: InputDecoration(
+                isDense: true,
+                contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                filled: true,
+                fillColor: Colors.white.withValues(alpha: 0.72),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(13),
+                  borderSide: BorderSide(
+                    color: widget.accent.withValues(alpha: 0.26),
+                  ),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(13),
+                  borderSide: BorderSide(color: widget.accent, width: 1.2),
+                ),
+              ),
+              style: AppTheme.numeric(
+                Theme.of(context).textTheme.labelMedium,
+              ).copyWith(color: widget.accent, fontWeight: FontWeight.w700),
             ),
           ),
-          focusedBorder: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(13),
-            borderSide: BorderSide(color: widget.accent, width: 1.2),
+          const SizedBox(width: 4),
+          Tooltip(
+            message: 'Apply seed order',
+            child: InkResponse(
+              onTap: _submit,
+              radius: 18,
+              child: Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: Colors.white.withValues(alpha: 0.62),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                    color: widget.accent.withValues(alpha: 0.24),
+                  ),
+                ),
+                child: Icon(
+                  Icons.check_rounded,
+                  size: 16,
+                  color: widget.accent,
+                ),
+              ),
+            ),
           ),
-        ),
-        style: AppTheme.numeric(
-          Theme.of(context).textTheme.labelMedium,
-        ).copyWith(color: widget.accent, fontWeight: FontWeight.w700),
+        ],
       ),
     );
   }

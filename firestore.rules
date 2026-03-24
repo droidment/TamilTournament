@@ -5,8 +5,10 @@ service cloud.firestore {
       return request.auth != null;
     }
 
-    function isOrganizer(uid) {
-      return signedIn() && request.auth.uid == uid;
+    function organizerEmail() {
+      return signedIn() && request.auth.token.email is string
+        ? request.auth.token.email
+        : '';
     }
 
     function validTournamentStatus() {
@@ -18,22 +20,37 @@ service cloud.firestore {
       ];
     }
 
-    function isTournamentOrganizer(tournamentId) {
+    function hasTournamentAccess(data) {
       return signedIn()
-        && get(
-          /databases/$(database)/documents/tournaments/$(tournamentId)
-        ).data.organizerUid == request.auth.uid;
+        && (
+          data.organizerUid == request.auth.uid
+          || organizerEmail() in data.organizerEmails
+        );
+    }
+
+    function isTournamentOrganizer(tournamentId) {
+      return hasTournamentAccess(
+        get(/databases/$(database)/documents/tournaments/$(tournamentId)).data
+      );
+    }
+
+    function validOrganizerEmails() {
+      return request.resource.data.organizerEmails is list
+        && request.resource.data.organizerEmails.size() > 0;
     }
 
     match /tournaments/{tournamentId} {
       allow create: if signedIn()
         && request.resource.data.organizerUid == request.auth.uid
+        && validOrganizerEmails()
+        && organizerEmail() in request.resource.data.organizerEmails
         && validTournamentStatus();
-      allow read: if isOrganizer(resource.data.organizerUid);
-      allow update: if isOrganizer(resource.data.organizerUid)
+      allow read: if hasTournamentAccess(resource.data);
+      allow update: if hasTournamentAccess(resource.data)
         && request.resource.data.organizerUid == resource.data.organizerUid
+        && validOrganizerEmails()
         && validTournamentStatus();
-      allow delete: if isOrganizer(resource.data.organizerUid);
+      allow delete: if hasTournamentAccess(resource.data);
 
       match /entries/{entryId} {
         allow read, create, update, delete: if isTournamentOrganizer(tournamentId);
