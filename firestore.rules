@@ -11,6 +11,12 @@ service cloud.firestore {
         : '';
     }
 
+    function hasOrganizerEmails(data) {
+      return data.keys().hasAny(['organizerEmails'])
+        && data.organizerEmails is list
+        && data.organizerEmails.size() > 0;
+    }
+
     function validTournamentStatus() {
       return request.resource.data.status in [
         'draft',
@@ -24,7 +30,10 @@ service cloud.firestore {
       return signedIn()
         && (
           data.organizerUid == request.auth.uid
-          || organizerEmail() in data.organizerEmails
+          || (
+            hasOrganizerEmails(data)
+            && organizerEmail() in data.organizerEmails
+          )
         );
     }
 
@@ -39,6 +48,11 @@ service cloud.firestore {
         && request.resource.data.organizerEmails.size() > 0;
     }
 
+    function organizerEmailsValidForUpdate() {
+      return !request.resource.data.keys().hasAny(['organizerEmails'])
+        || validOrganizerEmails();
+    }
+
     match /tournaments/{tournamentId} {
       allow create: if signedIn()
         && request.resource.data.organizerUid == request.auth.uid
@@ -48,7 +62,7 @@ service cloud.firestore {
       allow read: if hasTournamentAccess(resource.data);
       allow update: if hasTournamentAccess(resource.data)
         && request.resource.data.organizerUid == resource.data.organizerUid
-        && validOrganizerEmails()
+        && organizerEmailsValidForUpdate()
         && validTournamentStatus();
       allow delete: if hasTournamentAccess(resource.data);
 

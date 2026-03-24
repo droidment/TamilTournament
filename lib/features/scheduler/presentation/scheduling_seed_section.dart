@@ -30,6 +30,7 @@ final class _SchedulingSeedSectionState
       <String, List<String>>{};
   final Set<String> _savingCategoryIds = <String>{};
   bool _isSavingAll = false;
+  String? _selectedCategoryId;
 
   @override
   Widget build(BuildContext context) {
@@ -54,10 +55,30 @@ final class _SchedulingSeedSectionState
 
             final editedCount = _editedCategoryCount(snapshot);
             final pendingSaveCount = _pendingSaveCount(snapshot);
+            final visibleCategories = _visibleCategories(snapshot);
 
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (snapshot.readyCategories.length > 1) ...[
+                  _CategoryFilterBar(
+                    selectedCategoryId: _selectedCategoryId,
+                    categories: snapshot.readyCategories
+                        .map(
+                          (category) => (
+                            id: category.categoryId,
+                            name: category.categoryName,
+                          ),
+                        )
+                        .toList(growable: false),
+                    onSelected: (categoryId) {
+                      setState(() {
+                        _selectedCategoryId = categoryId;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: AppSpace.md),
+                ],
                 if (editedCount > 0 || pendingSaveCount > 0) ...[
                   _SeedDraftBanner(
                     title: editedCount > 0
@@ -98,37 +119,31 @@ final class _SchedulingSeedSectionState
                 ],
                 for (
                   var index = 0;
-                  index < snapshot.readyCategories.length;
+                  index < visibleCategories.length;
                   index++
                 ) ...[
                   _EditableSeedCategoryCard(
-                    category: snapshot.readyCategories[index],
-                    orderedEntries: _orderedEntries(
-                      snapshot.readyCategories[index],
-                    ),
-                    isEdited: _isCategoryEdited(
-                      snapshot.readyCategories[index],
-                    ),
+                    category: visibleCategories[index],
+                    orderedEntries: _orderedEntries(visibleCategories[index]),
+                    isEdited: _isCategoryEdited(visibleCategories[index]),
                     isSaving: _savingCategoryIds.contains(
-                      snapshot.readyCategories[index].categoryId,
+                      visibleCategories[index].categoryId,
                     ),
-                    needsSave: _categoryNeedsSave(
-                      snapshot.readyCategories[index],
-                    ),
+                    needsSave: _categoryNeedsSave(visibleCategories[index]),
                     onSetSeedPosition: (fromIndex, seedNumber) =>
                         _setSeedPosition(
-                          category: snapshot.readyCategories[index],
+                          category: visibleCategories[index],
                           fromIndex: fromIndex,
                           requestedSeedNumber: seedNumber,
                         ),
                     onResetCategory: () =>
-                        _resetCategory(snapshot.readyCategories[index]),
+                        _resetCategory(visibleCategories[index]),
                     onAutoSeedCategory: () =>
-                        _autoSeedCategory(snapshot.readyCategories[index]),
+                        _autoSeedCategory(visibleCategories[index]),
                     onSaveCategory: () =>
-                        _saveCategory(snapshot.readyCategories[index]),
+                        _saveCategory(visibleCategories[index]),
                   ),
-                  if (index < snapshot.readyCategories.length - 1)
+                  if (index < visibleCategories.length - 1)
                     const SizedBox(height: AppSpace.md),
                 ],
               ],
@@ -171,7 +186,7 @@ final class _SchedulingSeedSectionState
       }
       final normalized = _normalizeSeedIds(
         requestedSeedIds: draft,
-        checkedInEntries: category.checkedInEntries,
+        entries: category.entries,
       );
       if (!_sameIds(normalized, category.seedEntryIds)) {
         nextDrafts[category.categoryId] = normalized;
@@ -241,13 +256,13 @@ final class _SchedulingSeedSectionState
     return _normalizeSeedIds(
       requestedSeedIds:
           _draftSeedIdsByCategory[category.categoryId] ?? category.seedEntryIds,
-      checkedInEntries: category.checkedInEntries,
+      entries: category.entries,
     );
   }
 
   List<TournamentEntry> _orderedEntries(ReadyCategorySeed category) {
     final entryById = <String, TournamentEntry>{
-      for (final entry in category.checkedInEntries) entry.id: entry,
+      for (final entry in category.entries) entry.id: entry,
     };
     return _effectiveSeedIds(category)
         .map((entryId) => entryById[entryId])
@@ -379,7 +394,7 @@ final class _SchedulingSeedSectionState
             categoryId: category.categoryId,
             categoryName: category.categoryName,
             format: category.format,
-            checkedInEntries: category.checkedInEntries,
+            entries: category.entries,
             seedEntryIds: _effectiveSeedIds(category),
           );
       if (!mounted) {
@@ -431,7 +446,7 @@ final class _SchedulingSeedSectionState
               categoryId: category.categoryId,
               categoryName: category.categoryName,
               format: category.format,
-              checkedInEntries: category.checkedInEntries,
+              entries: category.entries,
               seedEntryIds: _effectiveSeedIds(category),
             );
       }
@@ -465,6 +480,28 @@ final class _SchedulingSeedSectionState
         });
       }
     }
+  }
+
+  List<ReadyCategorySeed> _visibleCategories(SchedulingSeedSnapshot snapshot) {
+    final selectedCategoryId = _selectedCategoryId;
+    if (selectedCategoryId == null) {
+      return snapshot.readyCategories;
+    }
+    final filtered = snapshot.readyCategories
+        .where((category) => category.categoryId == selectedCategoryId)
+        .toList(growable: false);
+    if (filtered.isNotEmpty) {
+      return filtered;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _selectedCategoryId = null;
+      });
+    });
+    return snapshot.readyCategories;
   }
 }
 
@@ -1170,9 +1207,9 @@ final class _SchedulingSeedEmptyState extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return const WorkspaceEmptyCard(
-      title: 'No ready categories yet',
+      title: 'No categories to seed yet',
       message:
-          'Check in at least two entries in a category to generate seed matchups.',
+          'Onboard at least one team in a category to start arranging the seed order.',
     );
   }
 }
@@ -1204,22 +1241,20 @@ final class _SchedulingSeedErrorState extends StatelessWidget {
 
 List<String> _normalizeSeedIds({
   required List<String> requestedSeedIds,
-  required List<TournamentEntry> checkedInEntries,
+  required List<TournamentEntry> entries,
 }) {
-  final checkedInEntryIds = <String>{
-    for (final entry in checkedInEntries) entry.id,
-  };
+  final entryIds = <String>{for (final entry in entries) entry.id};
   final normalized = <String>[];
   final seen = <String>{};
 
   for (final entryId in requestedSeedIds) {
-    if (!checkedInEntryIds.contains(entryId) || !seen.add(entryId)) {
+    if (!entryIds.contains(entryId) || !seen.add(entryId)) {
       continue;
     }
     normalized.add(entryId);
   }
 
-  for (final entry in checkedInEntries) {
+  for (final entry in entries) {
     if (seen.add(entry.id)) {
       normalized.add(entry.id);
     }
@@ -1253,4 +1288,84 @@ String _friendlyError(Object error) {
     return 'Seeding data is not ready yet in this environment. Try again in a moment.';
   }
   return message;
+}
+
+final class _CategoryFilterBar extends StatelessWidget {
+  const _CategoryFilterBar({
+    required this.selectedCategoryId,
+    required this.categories,
+    required this.onSelected,
+  });
+
+  final String? selectedCategoryId;
+  final List<({String id, String name})> categories;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _CategoryFilterChip(
+            label: 'All categories',
+            selected: selectedCategoryId == null,
+            onTap: () => onSelected(null),
+          ),
+          for (final category in categories) ...[
+            const SizedBox(width: AppSpace.xs),
+            _CategoryFilterChip(
+              label: category.name,
+              selected: selectedCategoryId == category.id,
+              onTap: () => onSelected(category.id),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+final class _CategoryFilterChip extends StatelessWidget {
+  const _CategoryFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.md,
+          vertical: AppSpace.sm,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? AppPalette.skySoft : AppPalette.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? AppPalette.sky.withValues(alpha: 0.4)
+                : AppPalette.line,
+          ),
+        ),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: selected ? AppPalette.ink : AppPalette.inkSoft,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
 }

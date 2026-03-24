@@ -51,18 +51,18 @@ final class SchedulingSeedRepository {
     required String categoryId,
     required String categoryName,
     required CategoryFormat format,
-    required List<TournamentEntry> checkedInEntries,
+    required List<TournamentEntry> entries,
     List<String> seedEntryIds = const [],
   }) async {
     final normalizedSeedEntryIds = _normalizeSeedEntryIds(
       seedEntryIds.isEmpty
-          ? checkedInEntries.map((entry) => entry.id).toList(growable: false)
+          ? entries.map((entry) => entry.id).toList(growable: false)
           : seedEntryIds,
-      checkedInEntries,
+      entries,
     );
 
     if (normalizedSeedEntryIds.length < 2) {
-      throw StateError('A seed plan needs at least two checked-in entries.');
+      throw StateError('A seed plan needs at least two entries.');
     }
 
     final plan = SchedulingSeedPlan(
@@ -95,22 +95,20 @@ final class SchedulingSeedRepository {
 
 List<String> _normalizeSeedEntryIds(
   List<String> requestedSeedEntryIds,
-  List<TournamentEntry> checkedInEntries,
+  List<TournamentEntry> entries,
 ) {
-  final checkedInEntryIds = <String>{
-    for (final entry in checkedInEntries) entry.id,
-  };
+  final entryIds = <String>{for (final entry in entries) entry.id};
   final seen = <String>{};
   final normalized = <String>[];
 
   for (final entryId in requestedSeedEntryIds) {
-    if (!checkedInEntryIds.contains(entryId) || !seen.add(entryId)) {
+    if (!entryIds.contains(entryId) || !seen.add(entryId)) {
       continue;
     }
     normalized.add(entryId);
   }
 
-  for (final entry in checkedInEntries) {
+  for (final entry in entries) {
     if (seen.add(entry.id)) {
       normalized.add(entry.id);
     }

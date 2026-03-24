@@ -30,6 +30,7 @@ class _EntriesSectionState extends ConsumerState<EntriesSection> {
   bool _isCreating = false;
   Set<String>? _busyEntryIdsState;
   final _EntrySortMode _sortMode = _EntrySortMode.uncheckedFirst;
+  String? _selectedCategoryId;
 
   Set<String> get _busyEntryIds => _busyEntryIdsState ??= <String>{};
 
@@ -287,20 +288,71 @@ class _EntriesSectionState extends ConsumerState<EntriesSection> {
               return const _EntriesEmptyState();
             }
 
-            final checkedInCount = items
+            final categoryById = {
+              for (final category in categoryItems) category.id: category,
+            };
+            final visibleItems = _visibleEntries(items, categoryById);
+            final checkedInCount = visibleItems
                 .where((entry) => entry.checkedIn)
                 .length;
-            final seededCount = items
+            final seededCount = visibleItems
                 .where((entry) => entry.hasAssignedSeed)
                 .length;
-            final sortedItems = _sortEntries(items);
+
+            if (_selectedCategoryId != null && visibleItems.isEmpty) {
+              return Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  if (categoryItems.length > 1) ...[
+                    _CategoryFilterBar(
+                      selectedCategoryId: _selectedCategoryId,
+                      categories: categoryItems
+                          .map(
+                            (category) =>
+                                (id: category.id, name: category.name),
+                          )
+                          .toList(growable: false),
+                      onSelected: (categoryId) {
+                        setState(() {
+                          _selectedCategoryId = categoryId;
+                        });
+                      },
+                    ),
+                    const SizedBox(height: AppSpace.md),
+                  ],
+                  _EntriesEmptyState(
+                    title: 'No teams in this category yet',
+                    message:
+                        'Switch categories or onboard the first team into this category.',
+                  ),
+                ],
+              );
+            }
+
+            final sortedItems = _sortEntries(visibleItems);
             return Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                if (categoryItems.length > 1) ...[
+                  _CategoryFilterBar(
+                    selectedCategoryId: _selectedCategoryId,
+                    categories: categoryItems
+                        .map(
+                          (category) => (id: category.id, name: category.name),
+                        )
+                        .toList(growable: false),
+                    onSelected: (categoryId) {
+                      setState(() {
+                        _selectedCategoryId = categoryId;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: AppSpace.md),
+                ],
                 WorkspaceStatRail(
                   metrics: [
                     WorkspaceMetricItemData(
-                      value: '${items.length}',
+                      value: '${visibleItems.length}',
                       label: 'entries',
                       foreground: const Color(0xFF456F77),
                       isHighlighted: true,
@@ -399,6 +451,29 @@ class _EntriesSectionState extends ConsumerState<EntriesSection> {
       );
     });
     return sorted;
+  }
+
+  List<TournamentEntry> _visibleEntries(
+    List<TournamentEntry> items,
+    Map<String, CategoryItem> categoryById,
+  ) {
+    final selectedCategoryId = _selectedCategoryId;
+    if (selectedCategoryId == null) {
+      return items;
+    }
+    final selectedCategoryName = categoryById[selectedCategoryId]?.name
+        .trim()
+        .toLowerCase();
+    final filtered = items
+        .where(
+          (entry) =>
+              entry.categoryId == selectedCategoryId ||
+              (selectedCategoryName != null &&
+                  entry.categoryName.trim().toLowerCase() ==
+                      selectedCategoryName),
+        )
+        .toList(growable: false);
+    return filtered;
   }
 }
 
@@ -1050,15 +1125,18 @@ final class _TeamAvatar extends StatelessWidget {
 }
 
 final class _EntriesEmptyState extends StatelessWidget {
-  const _EntriesEmptyState();
+  const _EntriesEmptyState({
+    this.title = 'No entries yet',
+    this.message =
+        'Start onboarding teams with roster names, category assignment, and optional seeds.',
+  });
+
+  final String title;
+  final String message;
 
   @override
   Widget build(BuildContext context) {
-    return const WorkspaceEmptyCard(
-      title: 'No entries yet',
-      message:
-          'Start onboarding teams with roster names, category assignment, and optional seeds.',
-    );
+    return WorkspaceEmptyCard(title: title, message: message);
   }
 }
 
@@ -1094,4 +1172,84 @@ String? Function(String?) _requiredField(String message) {
     }
     return null;
   };
+}
+
+final class _CategoryFilterBar extends StatelessWidget {
+  const _CategoryFilterBar({
+    required this.selectedCategoryId,
+    required this.categories,
+    required this.onSelected,
+  });
+
+  final String? selectedCategoryId;
+  final List<({String id, String name})> categories;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _CategoryFilterChip(
+            label: 'All categories',
+            selected: selectedCategoryId == null,
+            onTap: () => onSelected(null),
+          ),
+          for (final category in categories) ...[
+            const SizedBox(width: AppSpace.xs),
+            _CategoryFilterChip(
+              label: category.name,
+              selected: selectedCategoryId == category.id,
+              onTap: () => onSelected(category.id),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+final class _CategoryFilterChip extends StatelessWidget {
+  const _CategoryFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.md,
+          vertical: AppSpace.sm,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? AppPalette.sageSoft : AppPalette.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? AppPalette.sage.withValues(alpha: 0.4)
+                : AppPalette.line,
+          ),
+        ),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: selected ? AppPalette.ink : AppPalette.inkSoft,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+      ),
+    );
+  }
 }

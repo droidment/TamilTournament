@@ -66,6 +66,7 @@ final class SchedulingSeedPlan {
 final class SchedulingSeedSnapshot {
   SchedulingSeedSnapshot({
     required List<ReadyCategorySeed> readyCategories,
+    required this.totalEntries,
     required this.totalCheckedInEntries,
     required this.totalMatchups,
     required Map<String, SchedulingSeedPlan> seedPlansByCategoryId,
@@ -73,6 +74,7 @@ final class SchedulingSeedSnapshot {
        seedPlansByCategoryId = Map.unmodifiable(seedPlansByCategoryId);
 
   final List<ReadyCategorySeed> readyCategories;
+  final int totalEntries;
   final int totalCheckedInEntries;
   final int totalMatchups;
   final Map<String, SchedulingSeedPlan> seedPlansByCategoryId;
@@ -88,11 +90,12 @@ final class ReadyCategorySeed {
     required this.categoryName,
     required this.format,
     required this.formatLabel,
-    required List<TournamentEntry> checkedInEntries,
+    required List<TournamentEntry> entries,
+    required this.checkedInCount,
     required List<SeedMatchup> matchups,
     required List<String> seedEntryIds,
     required this.seedPlan,
-  }) : checkedInEntries = List.unmodifiable(checkedInEntries),
+  }) : entries = List.unmodifiable(entries),
        matchups = List.unmodifiable(matchups),
        seedEntryIds = List.unmodifiable(seedEntryIds);
 
@@ -100,17 +103,18 @@ final class ReadyCategorySeed {
   final String categoryName;
   final CategoryFormat format;
   final String formatLabel;
-  final List<TournamentEntry> checkedInEntries;
+  final List<TournamentEntry> entries;
+  final int checkedInCount;
   final List<SeedMatchup> matchups;
   final List<String> seedEntryIds;
   final SchedulingSeedPlan? seedPlan;
 
-  int get checkedInCount => checkedInEntries.length;
+  int get entryCount => entries.length;
 
   bool get hasSavedSeedPlan => seedPlan != null;
 
   List<String> get suggestedSeedEntryIds =>
-      checkedInEntries.map((entry) => entry.id).toList(growable: false);
+      entries.map((entry) => entry.id).toList(growable: false);
 }
 
 final class SeedMatchup {
@@ -145,12 +149,8 @@ SchedulingSeedSnapshot deriveSchedulingSeedSnapshot({
     for (final plan in seedPlans) plan.categoryId: plan,
   };
 
-  final checkedInByCategory = <String, List<TournamentEntry>>{};
+  final entriesByCategory = <String, List<TournamentEntry>>{};
   for (final entry in entries) {
-    if (!entry.checkedIn) {
-      continue;
-    }
-
     final category =
         categoryLookup[entry.categoryId.isNotEmpty
             ? entry.categoryId
@@ -160,21 +160,21 @@ SchedulingSeedSnapshot deriveSchedulingSeedSnapshot({
       continue;
     }
 
-    checkedInByCategory.putIfAbsent(category.id, () => <TournamentEntry>[]);
-    checkedInByCategory[category.id]!.add(entry);
+    entriesByCategory.putIfAbsent(category.id, () => <TournamentEntry>[]);
+    entriesByCategory[category.id]!.add(entry);
   }
 
   final readyCategories = <ReadyCategorySeed>[];
   for (final category in categories) {
-    final checkedInEntries = checkedInByCategory[category.id];
-    if (checkedInEntries == null || checkedInEntries.length < 2) {
+    final categoryEntries = entriesByCategory[category.id];
+    if (categoryEntries == null || categoryEntries.isEmpty) {
       continue;
     }
 
-    checkedInEntries.sort(compareEntriesForSeeding);
+    categoryEntries.sort(compareEntriesForSeeding);
     final seedPlan = seedPlanByCategoryId[category.id];
-    final orderedEntries = _orderCheckedInEntries(
-      checkedInEntries,
+    final orderedEntries = _orderEntries(
+      categoryEntries,
       seedPlan?.seedEntryIds,
     );
     readyCategories.add(
@@ -183,7 +183,8 @@ SchedulingSeedSnapshot deriveSchedulingSeedSnapshot({
         categoryName: category.name,
         format: category.format,
         formatLabel: category.format.label,
-        checkedInEntries: checkedInEntries,
+        entries: orderedEntries,
+        checkedInCount: orderedEntries.where((entry) => entry.checkedIn).length,
         matchups: _buildMatchups(category, orderedEntries),
         seedEntryIds: orderedEntries
             .map((entry) => entry.id)
@@ -195,6 +196,10 @@ SchedulingSeedSnapshot deriveSchedulingSeedSnapshot({
 
   return SchedulingSeedSnapshot(
     readyCategories: readyCategories,
+    totalEntries: readyCategories.fold<int>(
+      0,
+      (total, category) => total + category.entryCount,
+    ),
     totalCheckedInEntries: readyCategories.fold<int>(
       0,
       (total, category) => total + category.checkedInCount,
@@ -216,16 +221,16 @@ Map<String, CategoryItem> _buildCategoryLookup(List<CategoryItem> categories) {
   return lookup;
 }
 
-List<TournamentEntry> _orderCheckedInEntries(
-  List<TournamentEntry> checkedInEntries,
+List<TournamentEntry> _orderEntries(
+  List<TournamentEntry> categoryEntries,
   List<String>? seedEntryIds,
 ) {
   if (seedEntryIds == null || seedEntryIds.isEmpty) {
-    return List<TournamentEntry>.unmodifiable(checkedInEntries);
+    return List<TournamentEntry>.unmodifiable(categoryEntries);
   }
 
   final entryById = <String, TournamentEntry>{
-    for (final entry in checkedInEntries) entry.id: entry,
+    for (final entry in categoryEntries) entry.id: entry,
   };
   final seen = <String>{};
   final orderedEntries = <TournamentEntry>[];
@@ -241,7 +246,7 @@ List<TournamentEntry> _orderCheckedInEntries(
     }
   }
 
-  for (final entry in checkedInEntries) {
+  for (final entry in categoryEntries) {
     if (seen.add(entry.id)) {
       orderedEntries.add(entry);
     }

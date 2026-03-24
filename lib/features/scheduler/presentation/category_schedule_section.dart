@@ -7,7 +7,7 @@ import '../../tournaments/presentation/workspace_components.dart';
 import '../data/category_schedule_providers.dart';
 import '../domain/category_schedule.dart';
 
-final class CategoryScheduleSection extends ConsumerWidget {
+final class CategoryScheduleSection extends ConsumerStatefulWidget {
   const CategoryScheduleSection({
     super.key,
     required this.tournamentId,
@@ -18,8 +18,19 @@ final class CategoryScheduleSection extends ConsumerWidget {
   final bool embedded;
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final state = ref.watch(categoryScheduleSnapshotProvider(tournamentId));
+  ConsumerState<CategoryScheduleSection> createState() =>
+      _CategoryScheduleSectionState();
+}
+
+class _CategoryScheduleSectionState
+    extends ConsumerState<CategoryScheduleSection> {
+  String? _selectedCategoryId;
+
+  @override
+  Widget build(BuildContext context) {
+    final state = ref.watch(
+      categoryScheduleSnapshotProvider(widget.tournamentId),
+    );
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -35,18 +46,20 @@ final class CategoryScheduleSection extends ConsumerWidget {
           WorkspaceStatRail(
             metrics: [
               WorkspaceMetricItemData(
-                value: '${state.requireValue.categories.length}',
+                value: '${_visibleCategories(state.requireValue).length}',
                 label: 'categories',
                 foreground: const Color(0xFF456F77),
                 isHighlighted: true,
               ),
               WorkspaceMetricItemData(
-                value: '${state.requireValue.totalGroups}',
+                value:
+                    '${_visibleCategories(state.requireValue).fold<int>(0, (sum, category) => sum + category.groups.length)}',
                 label: 'groups',
                 foreground: const Color(0xFF365141),
               ),
               WorkspaceMetricItemData(
-                value: '${state.requireValue.totalMatches}',
+                value:
+                    '${_visibleCategories(state.requireValue).fold<int>(0, (sum, category) => sum + category.playableMatchCount)}',
                 label: 'matches',
                 foreground: const Color(0xFF8F6038),
               ),
@@ -59,15 +72,35 @@ final class CategoryScheduleSection extends ConsumerWidget {
               return const _EmptyState();
             }
 
+            final visibleCategories = _visibleCategories(snapshot);
             return Column(
               children: [
+                if (snapshot.categories.length > 1) ...[
+                  _CategoryFilterBar(
+                    selectedCategoryId: _selectedCategoryId,
+                    categories: snapshot.categories
+                        .map(
+                          (category) => (
+                            id: category.categoryId,
+                            name: category.categoryName,
+                          ),
+                        )
+                        .toList(growable: false),
+                    onSelected: (categoryId) {
+                      setState(() {
+                        _selectedCategoryId = categoryId;
+                      });
+                    },
+                  ),
+                  const SizedBox(height: AppSpace.md),
+                ],
                 for (
                   var index = 0;
-                  index < snapshot.categories.length;
+                  index < visibleCategories.length;
                   index++
                 ) ...[
-                  _CategoryScheduleCard(category: snapshot.categories[index]),
-                  if (index < snapshot.categories.length - 1)
+                  _CategoryScheduleCard(category: visibleCategories[index]),
+                  if (index < visibleCategories.length - 1)
                     const SizedBox(height: AppSpace.md),
                 ],
               ],
@@ -84,7 +117,7 @@ final class CategoryScheduleSection extends ConsumerWidget {
       ],
     );
 
-    if (embedded) {
+    if (widget.embedded) {
       return content;
     }
 
@@ -97,6 +130,30 @@ final class CategoryScheduleSection extends ConsumerWidget {
       ),
       child: content,
     );
+  }
+
+  List<GeneratedCategorySchedule> _visibleCategories(
+    TournamentCategoryScheduleSnapshot snapshot,
+  ) {
+    final selectedCategoryId = _selectedCategoryId;
+    if (selectedCategoryId == null) {
+      return snapshot.categories;
+    }
+    final filtered = snapshot.categories
+        .where((category) => category.categoryId == selectedCategoryId)
+        .toList(growable: false);
+    if (filtered.isNotEmpty) {
+      return filtered;
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _selectedCategoryId = null;
+      });
+    });
+    return snapshot.categories;
   }
 }
 
@@ -490,6 +547,86 @@ final class _ErrorState extends StatelessWidget {
     return WorkspaceErrorCard(
       title: 'Scheduling needs attention',
       message: message,
+    );
+  }
+}
+
+final class _CategoryFilterBar extends StatelessWidget {
+  const _CategoryFilterBar({
+    required this.selectedCategoryId,
+    required this.categories,
+    required this.onSelected,
+  });
+
+  final String? selectedCategoryId;
+  final List<({String id, String name})> categories;
+  final ValueChanged<String?> onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Row(
+        children: [
+          _CategoryFilterChip(
+            label: 'All categories',
+            selected: selectedCategoryId == null,
+            onTap: () => onSelected(null),
+          ),
+          for (final category in categories) ...[
+            const SizedBox(width: AppSpace.xs),
+            _CategoryFilterChip(
+              label: category.name,
+              selected: selectedCategoryId == category.id,
+              onTap: () => onSelected(category.id),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+final class _CategoryFilterChip extends StatelessWidget {
+  const _CategoryFilterChip({
+    required this.label,
+    required this.selected,
+    required this.onTap,
+  });
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(999),
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        curve: Curves.easeOutCubic,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppSpace.md,
+          vertical: AppSpace.sm,
+        ),
+        decoration: BoxDecoration(
+          color: selected ? AppPalette.skySoft : AppPalette.surface,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: selected
+                ? AppPalette.sky.withValues(alpha: 0.4)
+                : AppPalette.line,
+          ),
+        ),
+        child: Text(
+          label,
+          style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            color: selected ? AppPalette.ink : AppPalette.inkSoft,
+            fontWeight: selected ? FontWeight.w700 : FontWeight.w500,
+          ),
+        ),
+      ),
     );
   }
 }
