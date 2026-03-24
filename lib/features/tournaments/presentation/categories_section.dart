@@ -5,11 +5,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../theme/app_theme.dart';
 import '../../categories/data/category_providers.dart';
 import '../../categories/domain/category_item.dart';
+import 'workspace_components.dart';
 
 final class CategoriesSection extends ConsumerStatefulWidget {
-  const CategoriesSection({super.key, required this.tournamentId});
+  const CategoriesSection({
+    super.key,
+    required this.tournamentId,
+    this.embedded = false,
+  });
 
   final String tournamentId;
+  final bool embedded;
 
   @override
   ConsumerState<CategoriesSection> createState() => _CategoriesSectionState();
@@ -175,7 +181,91 @@ final class _CategoriesSectionState extends ConsumerState<CategoriesSection> {
     final categories = ref.watch(
       tournamentCategoriesProvider(widget.tournamentId),
     );
-    final theme = Theme.of(context);
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        WorkspaceSectionLead(
+          title: 'Categories',
+          description:
+              'Tournament-scoped setup for divisions, formats, and minimum player rules.',
+          trailing: FilledButton(
+            onPressed: _isCreating ? null : _showCreateCategoryDialog,
+            child: Text(_isCreating ? 'Creating...' : 'New category'),
+          ),
+        ),
+        const SizedBox(height: AppSpace.lg),
+        categories.when(
+          data: (items) {
+            if (items.isEmpty) {
+              return const _CategoriesEmptyState();
+            }
+
+            final groupCount = items
+                .where((category) => category.format == CategoryFormat.group)
+                .length;
+            final checkedInPairs = items.fold<int>(
+              0,
+              (sum, category) => sum + category.checkedInPairs,
+            );
+
+            return Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                WorkspaceStatRail(
+                  metrics: [
+                    WorkspaceMetricItemData(
+                      value: '${items.length}',
+                      label: 'categories',
+                      foreground: const Color(0xFF456F77),
+                      isHighlighted: true,
+                    ),
+                    WorkspaceMetricItemData(
+                      value: '$groupCount',
+                      label: 'group draws',
+                      foreground: const Color(0xFF5F7243),
+                    ),
+                    WorkspaceMetricItemData(
+                      value: '${items.length - groupCount}',
+                      label: 'knockout draws',
+                      foreground: const Color(0xFF8F6038),
+                    ),
+                    WorkspaceMetricItemData(
+                      value: '$checkedInPairs',
+                      label: 'checked in',
+                      foreground: AppPalette.sageStrong,
+                    ),
+                  ],
+                ),
+                const SizedBox(height: AppSpace.lg),
+                WorkspaceSurfaceCard(
+                  child: Column(
+                    children: [
+                      for (var index = 0; index < items.length; index++) ...[
+                        _CategoryRowCard(category: items[index]),
+                        if (index < items.length - 1)
+                          const Padding(
+                            padding: EdgeInsets.symmetric(
+                              vertical: AppSpace.md,
+                            ),
+                            child: Divider(height: 1),
+                          ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            );
+          },
+          loading: () => const _CategoriesLoadingState(),
+          error: (error, _) =>
+              _CategoriesErrorState(message: _friendlyError(error)),
+        ),
+      ],
+    );
+
+    if (widget.embedded) {
+      return content;
+    }
 
     return Container(
       padding: const EdgeInsets.all(AppSpace.lg),
@@ -184,74 +274,7 @@ final class _CategoriesSectionState extends ConsumerState<CategoriesSection> {
         borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: AppPalette.line),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isCompact = constraints.maxWidth < 720;
-
-              final titleBlock = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Categories', style: theme.textTheme.headlineMedium),
-                  const SizedBox(height: AppSpace.xs),
-                  Text(
-                    'Tournament-scoped category setup and drafts.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppPalette.inkSoft,
-                    ),
-                  ),
-                ],
-              );
-
-              final action = FilledButton(
-                onPressed: _isCreating ? null : _showCreateCategoryDialog,
-                child: Text(_isCreating ? 'Creating...' : 'New category'),
-              );
-
-              if (isCompact) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    titleBlock,
-                    const SizedBox(height: AppSpace.md),
-                    action,
-                  ],
-                );
-              }
-
-              return Row(
-                children: [
-                  Expanded(child: titleBlock),
-                  const SizedBox(width: AppSpace.md),
-                  action,
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: AppSpace.lg),
-          categories.when(
-            data: (items) {
-              if (items.isEmpty) {
-                return const _CategoriesEmptyState();
-              }
-              return Column(
-                children: [
-                  for (var index = 0; index < items.length; index++) ...[
-                    _CategoryRowCard(category: items[index]),
-                    if (index < items.length - 1)
-                      const SizedBox(height: AppSpace.md),
-                  ],
-                ],
-              );
-            },
-            loading: () => const _CategoriesLoadingState(),
-            error: (error, _) =>
-                _CategoriesErrorState(message: _friendlyError(error)),
-          ),
-        ],
-      ),
+      child: content,
     );
   }
 }
@@ -268,129 +291,82 @@ final class _CategoryRowCard extends StatelessWidget {
       CategoryFormat.group => AppPalette.sageStrong,
       CategoryFormat.knockout => AppPalette.apricot,
     };
-    final chips = [
-      _CategoryChip(
-        label: category.format.label,
-        tint: accent.withValues(alpha: 0.18),
-        border: accent.withValues(alpha: 0.45),
-        foreground: AppPalette.ink,
-      ),
-      _CategoryChip(
-        label: '${category.minPlayers} min',
-        tint: AppPalette.skySoft,
-        border: AppPalette.sky.withValues(alpha: 0.45),
-        foreground: const Color(0xFF456F77),
-      ),
-      _CategoryChip(
-        label: '${category.checkedInPairs} checked in',
-        tint: AppPalette.oliveSoft,
-        border: AppPalette.oliveStrong.withValues(alpha: 0.45),
-        foreground: const Color(0xFF5F7243),
-      ),
-    ];
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppPalette.surfaceSoft,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppPalette.line),
-      ),
-      child: Column(
-        children: [
-          Container(
-            height: 4,
-            decoration: BoxDecoration(
-              color: accent,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(24),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 760;
+
+        final details = Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              category.name,
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w700,
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(AppSpace.lg),
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                final isCompact = constraints.maxWidth < 760;
-
-                final details = Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(category.name, style: theme.textTheme.titleLarge),
-                    const SizedBox(height: AppSpace.xs),
-                    Text(
-                      '${category.format.label} · min ${category.minPlayers} players',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: AppPalette.inkSoft,
-                      ),
-                    ),
-                  ],
-                );
-
-                final chipWrap = Wrap(
-                  spacing: AppSpace.sm,
-                  runSpacing: AppSpace.sm,
-                  alignment: isCompact
-                      ? WrapAlignment.start
-                      : WrapAlignment.end,
-                  children: chips,
-                );
-
-                if (isCompact) {
-                  return Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      details,
-                      const SizedBox(height: AppSpace.md),
-                      chipWrap,
-                    ],
-                  );
-                }
-
-                return Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Expanded(child: details),
-                    const SizedBox(width: AppSpace.md),
-                    Flexible(child: chipWrap),
-                  ],
-                );
-              },
+            const SizedBox(height: AppSpace.xs),
+            Text(
+              'Minimum ${category.minPlayers} players',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppPalette.inkSoft,
+              ),
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
+          ],
+        );
 
-final class _CategoryChip extends StatelessWidget {
-  const _CategoryChip({
-    required this.label,
-    required this.tint,
-    required this.border,
-    required this.foreground,
-  });
+        final rightColumn = Wrap(
+          spacing: AppSpace.sm,
+          runSpacing: AppSpace.sm,
+          crossAxisAlignment: WrapCrossAlignment.center,
+          alignment: isCompact ? WrapAlignment.start : WrapAlignment.end,
+          children: [
+            WorkspaceTag(
+              label: category.format.label.toUpperCase(),
+              background: accent.withValues(alpha: 0.16),
+              foreground: accent == AppPalette.apricot
+                  ? const Color(0xFF7E572E)
+                  : AppPalette.sageStrong,
+            ),
+            Text(
+              '${category.checkedInPairs} checked in',
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppPalette.inkSoft,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        );
 
-  final String label;
-  final Color tint;
-  final Color border;
-  final Color foreground;
+        if (isCompact) {
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              details,
+              const SizedBox(height: AppSpace.md),
+              rightColumn,
+            ],
+          );
+        }
 
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-      decoration: BoxDecoration(
-        color: tint,
-        borderRadius: BorderRadius.circular(AppRadii.chip),
-        border: Border.all(color: border),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(
-          context,
-        ).textTheme.bodySmall?.copyWith(color: foreground),
-      ),
+        return Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Container(
+              width: 6,
+              height: 46,
+              decoration: BoxDecoration(
+                color: accent,
+                borderRadius: BorderRadius.circular(999),
+              ),
+            ),
+            const SizedBox(width: AppSpace.md),
+            Expanded(child: details),
+            const SizedBox(width: AppSpace.md),
+            Flexible(child: rightColumn),
+          ],
+        );
+      },
     );
   }
 }
@@ -487,28 +463,10 @@ final class _CategoriesEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpace.xl),
-      decoration: BoxDecoration(
-        color: AppPalette.surfaceSoft,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppPalette.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('No categories yet', style: theme.textTheme.titleLarge),
-          const SizedBox(height: AppSpace.sm),
-          Text(
-            'Create the first draft category for this tournament to start shaping entry and scheduling workflows.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: AppPalette.inkSoft,
-            ),
-          ),
-        ],
-      ),
+    return const WorkspaceEmptyCard(
+      title: 'No categories yet',
+      message:
+          'Create the first draft category for this tournament to start shaping entry and scheduling workflows.',
     );
   }
 }
@@ -520,33 +478,9 @@ final class _CategoriesErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpace.lg),
-      decoration: BoxDecoration(
-        color: const Color(0x24C97D6B),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0x47C97D6B)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Categories need attention',
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: const Color(0xFF7B4D42),
-            ),
-          ),
-          const SizedBox(height: AppSpace.sm),
-          Text(
-            message,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: const Color(0xFF7B4D42),
-            ),
-          ),
-        ],
-      ),
+    return WorkspaceErrorCard(
+      title: 'Categories need attention',
+      message: message,
     );
   }
 }

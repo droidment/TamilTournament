@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../theme/app_theme.dart';
+import '../../tournaments/presentation/workspace_components.dart';
 import '../data/court_providers.dart';
 import '../domain/tournament_court.dart';
 
@@ -10,10 +11,12 @@ final class CourtManagementSection extends ConsumerStatefulWidget {
     super.key,
     required this.tournamentId,
     required this.initialCourtCount,
+    this.embedded = false,
   });
 
   final String tournamentId;
   final int initialCourtCount;
+  final bool embedded;
 
   @override
   ConsumerState<CourtManagementSection> createState() =>
@@ -259,7 +262,79 @@ class _CourtManagementSectionState
   @override
   Widget build(BuildContext context) {
     final courts = ref.watch(tournamentCourtsProvider(widget.tournamentId));
-    final theme = Theme.of(context);
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const WorkspaceSectionLead(
+          title: 'Courts',
+          description:
+              'Set the active court pool before live scheduling begins, then pause or restore courts as the venue changes.',
+        ),
+        const SizedBox(height: AppSpace.lg),
+        if (courts.hasValue)
+          WorkspaceStatRail(
+            metrics: [
+              WorkspaceMetricItemData(
+                value: '${courts.requireValue.length}',
+                label: 'configured',
+                foreground: const Color(0xFF456F77),
+                isHighlighted: true,
+              ),
+              WorkspaceMetricItemData(
+                value:
+                    '${courts.requireValue.where((court) => court.isAvailable).length}',
+                label: 'active',
+                foreground: const Color(0xFF365141),
+              ),
+              WorkspaceMetricItemData(
+                value:
+                    '${courts.requireValue.where((court) => !court.isAvailable).length}',
+                label: 'paused',
+                foreground: const Color(0xFF8F6038),
+              ),
+            ],
+          ),
+        if (courts.hasValue) const SizedBox(height: AppSpace.lg),
+        _CourtSetupBar(
+          controller: _courtCountController,
+          isGenerating: _isGenerating,
+          onGenerate: _generateCourts,
+        ),
+        const SizedBox(height: AppSpace.lg),
+        courts.when(
+          data: (items) {
+            _syncConfiguredCourtCount(items);
+            if (items.isEmpty) {
+              return const _CourtEmptyState();
+            }
+            return Wrap(
+              spacing: AppSpace.md,
+              runSpacing: AppSpace.md,
+              children: [
+                for (final court in items)
+                  _CourtCard(
+                    court: court,
+                    isBusy: _busyCourtIds.contains(court.id),
+                    onToggleAvailability: () => _toggleCourt(court),
+                    onEditDetails: () => _editCourtDetails(court),
+                  ),
+              ],
+            );
+          },
+          loading: () => const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: AppSpace.xl),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+          error: (error, _) => _CourtErrorState(message: _friendlyError(error)),
+        ),
+      ],
+    );
+
+    if (widget.embedded) {
+      return content;
+    }
 
     return Container(
       padding: const EdgeInsets.all(AppSpace.lg),
@@ -268,123 +343,7 @@ class _CourtManagementSectionState
         borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: AppPalette.line),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isCompact = constraints.maxWidth < 760;
-
-              final titleBlock = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('Courts', style: theme.textTheme.headlineMedium),
-                  const SizedBox(height: AppSpace.xs),
-                  Text(
-                    'Set the active court pool before live scheduling begins, then pause or restore courts as the venue changes.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppPalette.inkSoft,
-                    ),
-                  ),
-                ],
-              );
-
-              final metrics =
-                  courts.whenOrNull(
-                    data: (items) {
-                      final available = items
-                          .where((court) => court.isAvailable)
-                          .length;
-                      return Wrap(
-                        spacing: AppSpace.sm,
-                        runSpacing: AppSpace.sm,
-                        alignment: isCompact
-                            ? WrapAlignment.start
-                            : WrapAlignment.end,
-                        children: [
-                          _CourtSummaryChip(
-                            label: '${items.length} total',
-                            tint: AppPalette.skySoft,
-                            border: AppPalette.sky.withValues(alpha: 0.35),
-                            foreground: const Color(0xFF456F77),
-                          ),
-                          _CourtSummaryChip(
-                            label: '$available active',
-                            tint: AppPalette.sageSoft,
-                            border: AppPalette.sage.withValues(alpha: 0.35),
-                            foreground: const Color(0xFF365141),
-                          ),
-                          _CourtSummaryChip(
-                            label: '${items.length - available} paused',
-                            tint: AppPalette.apricotSoft,
-                            border: AppPalette.apricot.withValues(alpha: 0.35),
-                            foreground: const Color(0xFF8F6038),
-                          ),
-                        ],
-                      );
-                    },
-                  ) ??
-                  const SizedBox.shrink();
-
-              if (isCompact) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    titleBlock,
-                    const SizedBox(height: AppSpace.md),
-                    metrics,
-                  ],
-                );
-              }
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: titleBlock),
-                  const SizedBox(width: AppSpace.md),
-                  Flexible(child: metrics),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: AppSpace.lg),
-          _CourtSetupBar(
-            controller: _courtCountController,
-            isGenerating: _isGenerating,
-            onGenerate: _generateCourts,
-          ),
-          const SizedBox(height: AppSpace.lg),
-          courts.when(
-            data: (items) {
-              _syncConfiguredCourtCount(items);
-              if (items.isEmpty) {
-                return const _CourtEmptyState();
-              }
-              return Wrap(
-                spacing: AppSpace.md,
-                runSpacing: AppSpace.md,
-                children: [
-                  for (final court in items)
-                    _CourtCard(
-                      court: court,
-                      isBusy: _busyCourtIds.contains(court.id),
-                      onToggleAvailability: () => _toggleCourt(court),
-                      onEditDetails: () => _editCourtDetails(court),
-                    ),
-                ],
-              );
-            },
-            loading: () => const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: AppSpace.xl),
-                child: CircularProgressIndicator(),
-              ),
-            ),
-            error: (error, _) =>
-                _CourtErrorState(message: _friendlyError(error)),
-          ),
-        ],
-      ),
+      child: content,
     );
   }
 }
@@ -402,13 +361,8 @@ final class _CourtSetupBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(AppSpace.md),
-      decoration: BoxDecoration(
-        color: AppPalette.surfaceSoft,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: AppPalette.line),
-      ),
+    return WorkspaceSurfaceCard(
+      padding: const EdgeInsets.all(AppSpace.lg),
       child: Wrap(
         spacing: AppSpace.md,
         runSpacing: AppSpace.md,
@@ -432,7 +386,7 @@ final class _CourtSetupBar extends StatelessWidget {
           ConstrainedBox(
             constraints: const BoxConstraints(maxWidth: 420),
             child: Text(
-              'Generating keeps `C1..Cn`, preserves edited names and notes, and trims only courts above the new limit.',
+              'Generating keeps C1..Cn, preserves edited names and notes, and trims only courts above the new limit.',
               style: Theme.of(
                 context,
               ).textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
@@ -464,117 +418,65 @@ final class _CourtCard extends StatelessWidget {
         ? AppPalette.sageStrong
         : AppPalette.apricot;
 
-    return Container(
+    return SizedBox(
       width: 260,
-      decoration: BoxDecoration(
-        color: AppPalette.surfaceSoft,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppPalette.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 4,
-            decoration: BoxDecoration(
-              color: accent,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(24),
+      child: WorkspaceSurfaceCard(
+        accent: accent,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(court.name, style: theme.textTheme.titleLarge),
+            const SizedBox(height: AppSpace.xs),
+            Text(
+              court.code,
+              style: AppTheme.numeric(
+                theme.textTheme.bodySmall,
+              ).copyWith(color: AppPalette.inkSoft),
+            ),
+            const SizedBox(height: AppSpace.md),
+            WorkspaceTag(
+              label: court.status.label,
+              background: court.isAvailable
+                  ? AppPalette.sageSoft
+                  : AppPalette.apricotSoft,
+              foreground: court.isAvailable
+                  ? const Color(0xFF365141)
+                  : const Color(0xFF8F6038),
+            ),
+            const SizedBox(height: AppSpace.md),
+            Text(
+              court.note.trim().isEmpty
+                  ? 'No operational note yet.'
+                  : court.note,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: court.note.trim().isEmpty
+                    ? AppPalette.inkMuted
+                    : AppPalette.inkSoft,
               ),
             ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(AppSpace.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            const SizedBox(height: AppSpace.md),
+            Wrap(
+              spacing: AppSpace.sm,
+              runSpacing: AppSpace.sm,
               children: [
-                Text(court.name, style: theme.textTheme.titleLarge),
-                const SizedBox(height: AppSpace.xs),
-                Text(
-                  court.code,
-                  style: AppTheme.numeric(
-                    theme.textTheme.bodySmall,
-                  ).copyWith(color: AppPalette.inkSoft),
+                OutlinedButton(
+                  onPressed: isBusy ? null : onEditDetails,
+                  child: const Text('Edit court'),
                 ),
-                const SizedBox(height: AppSpace.md),
-                _CourtSummaryChip(
-                  label: court.status.label,
-                  tint: court.isAvailable
-                      ? AppPalette.sageSoft
-                      : AppPalette.apricotSoft,
-                  border: accent.withValues(alpha: 0.35),
-                  foreground: court.isAvailable
-                      ? const Color(0xFF365141)
-                      : const Color(0xFF8F6038),
-                ),
-                const SizedBox(height: AppSpace.md),
-                Text(
-                  court.note.trim().isEmpty
-                      ? 'No operational note yet.'
-                      : court.note,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: court.note.trim().isEmpty
-                        ? AppPalette.inkMuted
-                        : AppPalette.inkSoft,
+                FilledButton(
+                  onPressed: isBusy ? null : onToggleAvailability,
+                  child: Text(
+                    isBusy
+                        ? 'Updating...'
+                        : court.isAvailable
+                        ? 'Pause court'
+                        : 'Restore court',
                   ),
-                ),
-                const SizedBox(height: AppSpace.md),
-                Wrap(
-                  spacing: AppSpace.sm,
-                  runSpacing: AppSpace.sm,
-                  children: [
-                    OutlinedButton(
-                      onPressed: isBusy ? null : onEditDetails,
-                      child: const Text('Edit court'),
-                    ),
-                    FilledButton(
-                      onPressed: isBusy ? null : onToggleAvailability,
-                      child: Text(
-                        isBusy
-                            ? 'Updating...'
-                            : court.isAvailable
-                            ? 'Pause court'
-                            : 'Restore court',
-                      ),
-                    ),
-                  ],
                 ),
               ],
             ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-final class _CourtSummaryChip extends StatelessWidget {
-  const _CourtSummaryChip({
-    required this.label,
-    required this.tint,
-    required this.border,
-    required this.foreground,
-  });
-
-  final String label;
-  final Color tint;
-  final Color border;
-  final Color foreground;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: tint,
-        borderRadius: BorderRadius.circular(AppRadii.chip),
-        border: Border.all(color: border),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(
-          context,
-        ).textTheme.bodySmall?.copyWith(color: foreground),
+          ],
+        ),
       ),
     );
   }
@@ -585,28 +487,10 @@ final class _CourtEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpace.xl),
-      decoration: BoxDecoration(
-        color: AppPalette.surfaceSoft,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppPalette.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('No courts configured', style: theme.textTheme.titleLarge),
-          const SizedBox(height: AppSpace.sm),
-          Text(
-            'Start by generating the productive court pool for this tournament.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: AppPalette.inkSoft,
-            ),
-          ),
-        ],
-      ),
+    return const WorkspaceEmptyCard(
+      title: 'No courts configured',
+      message:
+          'Start by generating the productive court pool for this tournament.',
     );
   }
 }
@@ -618,34 +502,7 @@ final class _CourtErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpace.lg),
-      decoration: BoxDecoration(
-        color: const Color(0x24C97D6B),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0x47C97D6B)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Courts need attention',
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: const Color(0xFF7B4D42),
-            ),
-          ),
-          const SizedBox(height: AppSpace.sm),
-          Text(
-            message,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: const Color(0xFF7B4D42),
-            ),
-          ),
-        ],
-      ),
-    );
+    return WorkspaceErrorCard(title: 'Courts need attention', message: message);
   }
 }
 

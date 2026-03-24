@@ -85,8 +85,8 @@ final class AppTheme {
       elevatedButtonTheme: ElevatedButtonThemeData(
         style: ElevatedButton.styleFrom(
           elevation: 0,
-          backgroundColor: AppPalette.sage,
-          foregroundColor: AppPalette.ink,
+          backgroundColor: AppPalette.sageStrong,
+          foregroundColor: AppPalette.surface,
           disabledBackgroundColor: AppPalette.lineStrong,
           disabledForegroundColor: AppPalette.inkMuted,
           padding: const EdgeInsets.symmetric(
@@ -101,8 +101,8 @@ final class AppTheme {
       ),
       filledButtonTheme: FilledButtonThemeData(
         style: FilledButton.styleFrom(
-          backgroundColor: AppPalette.sage,
-          foregroundColor: AppPalette.ink,
+          backgroundColor: AppPalette.sageStrong,
+          foregroundColor: AppPalette.surface,
           padding: const EdgeInsets.symmetric(
             horizontal: AppSpace.xl,
             vertical: AppSpace.md,
@@ -123,6 +123,19 @@ final class AppTheme {
           ),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(AppRadii.control),
+          ),
+          textStyle: textTheme.labelLarge,
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppPalette.inkSoft,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(AppRadii.control),
+          ),
+          padding: const EdgeInsets.symmetric(
+            horizontal: AppSpace.md,
+            vertical: AppSpace.sm,
           ),
           textStyle: textTheme.labelLarge,
         ),
@@ -256,23 +269,23 @@ final class AppTheme {
 }
 
 final class AppPalette {
-  static const Color background = Color(0xFFF6F1E8);
-  static const Color surface = Color(0xFFFFFDF9);
-  static const Color surfaceSoft = Color(0xFFFAF6EF);
-  static const Color line = Color(0xFFDDD3C4);
-  static const Color lineStrong = Color(0xFFCABDAA);
-  static const Color ink = Color(0xFF1D2A22);
-  static const Color inkSoft = Color(0xFF37473F);
-  static const Color inkMuted = Color(0xFF5F6D65);
-  static const Color sage = Color(0xFF98BFA6);
-  static const Color sageStrong = Color(0xFF6F9A82);
-  static const Color sageSoft = Color(0xFFDCE9E0);
-  static const Color sky = Color(0xFF8DBEC6);
-  static const Color skySoft = Color(0xFFE8F3F5);
-  static const Color apricot = Color(0xFFDDB085);
-  static const Color apricotSoft = Color(0xFFF7EDE1);
-  static const Color oliveStrong = Color(0xFF8FA16F);
-  static const Color oliveSoft = Color(0xFFEEF3E3);
+  static const Color background = Color(0xFFF7F8EE);
+  static const Color surface = Color(0xFFFFFEFB);
+  static const Color surfaceSoft = Color(0xFFF0F4E8);
+  static const Color line = Color(0xFFDCE4D4);
+  static const Color lineStrong = Color(0xFFC7D3C1);
+  static const Color ink = Color(0xFF324A44);
+  static const Color inkSoft = Color(0xFF53645C);
+  static const Color inkMuted = Color(0xFF6B776F);
+  static const Color sage = Color(0xFFB6E7D9);
+  static const Color sageStrong = Color(0xFF446D63);
+  static const Color sageSoft = Color(0xFFD9F2E8);
+  static const Color sky = Color(0xFFA9D8D6);
+  static const Color skySoft = Color(0xFFE4F4F2);
+  static const Color apricot = Color(0xFFE0AD71);
+  static const Color apricotSoft = Color(0xFFF4E0C4);
+  static const Color oliveStrong = Color(0xFF8E9773);
+  static const Color oliveSoft = Color(0xFFEBEFD9);
   static const Color blossom = Color(0xFFD3AEB4);
   static const Color terracotta = Color(0xFFC97D6B);
   static const Color menCategory = Color(0xFF8BB8BA);
@@ -291,8 +304,8 @@ final class AppSpace {
 }
 
 final class AppRadii {
-  static const double field = 18;
-  static const double control = 20;
-  static const double chip = 999;
-  static const double panel = 28;
+  static const double field = 16;
+  static const double control = 14;
+  static const double chip = 12;
+  static const double panel = 22;
 }

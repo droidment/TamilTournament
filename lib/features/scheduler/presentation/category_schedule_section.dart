@@ -2,18 +2,88 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../theme/app_theme.dart';
+import '../../tournaments/presentation/workspace_components.dart';
 import '../data/category_schedule_providers.dart';
 import '../domain/category_schedule.dart';
 
 final class CategoryScheduleSection extends ConsumerWidget {
-  const CategoryScheduleSection({super.key, required this.tournamentId});
+  const CategoryScheduleSection({
+    super.key,
+    required this.tournamentId,
+    this.embedded = false,
+  });
 
   final String tournamentId;
+  final bool embedded;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final state = ref.watch(categoryScheduleSnapshotProvider(tournamentId));
-    final theme = Theme.of(context);
+    final content = Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const WorkspaceSectionLead(
+          title: 'Schedule',
+          description:
+              'Generate category groups, rounds, and qualification paths from the teams you have already seeded.',
+        ),
+        const SizedBox(height: AppSpace.lg),
+        if (state.hasValue)
+          WorkspaceStatRail(
+            metrics: [
+              WorkspaceMetricItemData(
+                value: '${state.requireValue.categories.length}',
+                label: 'categories',
+                foreground: const Color(0xFF456F77),
+                isHighlighted: true,
+              ),
+              WorkspaceMetricItemData(
+                value: '${state.requireValue.totalGroups}',
+                label: 'groups',
+                foreground: const Color(0xFF365141),
+              ),
+              WorkspaceMetricItemData(
+                value: '${state.requireValue.totalMatches}',
+                label: 'matches',
+                foreground: const Color(0xFF8F6038),
+              ),
+            ],
+          ),
+        if (state.hasValue) const SizedBox(height: AppSpace.lg),
+        state.when(
+          data: (snapshot) {
+            if (snapshot.isEmpty) {
+              return const _EmptyState();
+            }
+
+            return Column(
+              children: [
+                for (
+                  var index = 0;
+                  index < snapshot.categories.length;
+                  index++
+                ) ...[
+                  _CategoryScheduleCard(category: snapshot.categories[index]),
+                  if (index < snapshot.categories.length - 1)
+                    const SizedBox(height: AppSpace.md),
+                ],
+              ],
+            );
+          },
+          loading: () => const Center(
+            child: Padding(
+              padding: EdgeInsets.symmetric(vertical: AppSpace.xl),
+              child: CircularProgressIndicator(),
+            ),
+          ),
+          error: (error, _) => _ErrorState(message: error.toString()),
+        ),
+      ],
+    );
+
+    if (embedded) {
+      return content;
+    }
 
     return Container(
       padding: const EdgeInsets.all(AppSpace.lg),
@@ -22,114 +92,7 @@ final class CategoryScheduleSection extends ConsumerWidget {
         borderRadius: BorderRadius.circular(AppRadii.panel),
         border: Border.all(color: AppPalette.line),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isCompact = constraints.maxWidth < 760;
-
-              final titleBlock = Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Grouping and schedule',
-                    style: theme.textTheme.headlineMedium,
-                  ),
-                  const SizedBox(height: AppSpace.xs),
-                  Text(
-                    'Generate category groups and round order from the teams you have onboarded and seeded.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppPalette.inkSoft,
-                    ),
-                  ),
-                ],
-              );
-
-              final metrics =
-                  state.whenOrNull(
-                    data: (snapshot) => Wrap(
-                      spacing: AppSpace.sm,
-                      runSpacing: AppSpace.sm,
-                      alignment: isCompact
-                          ? WrapAlignment.start
-                          : WrapAlignment.end,
-                      children: [
-                        _SummaryChip(
-                          label: '${snapshot.categories.length} categories',
-                          tint: AppPalette.skySoft,
-                          border: AppPalette.sky.withValues(alpha: 0.35),
-                          foreground: const Color(0xFF456F77),
-                        ),
-                        _SummaryChip(
-                          label: '${snapshot.totalGroups} groups',
-                          tint: AppPalette.sageSoft,
-                          border: AppPalette.sage.withValues(alpha: 0.35),
-                          foreground: const Color(0xFF365141),
-                        ),
-                        _SummaryChip(
-                          label: '${snapshot.totalMatches} matches',
-                          tint: AppPalette.apricotSoft,
-                          border: AppPalette.apricot.withValues(alpha: 0.35),
-                          foreground: const Color(0xFF8F6038),
-                        ),
-                      ],
-                    ),
-                  ) ??
-                  const SizedBox.shrink();
-
-              if (isCompact) {
-                return Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    titleBlock,
-                    const SizedBox(height: AppSpace.md),
-                    metrics,
-                  ],
-                );
-              }
-
-              return Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Expanded(child: titleBlock),
-                  const SizedBox(width: AppSpace.md),
-                  Flexible(child: metrics),
-                ],
-              );
-            },
-          ),
-          const SizedBox(height: AppSpace.lg),
-          state.when(
-            data: (snapshot) {
-              if (snapshot.isEmpty) {
-                return const _EmptyState();
-              }
-
-              return Column(
-                children: [
-                  for (
-                    var index = 0;
-                    index < snapshot.categories.length;
-                    index++
-                  ) ...[
-                    _CategoryScheduleCard(category: snapshot.categories[index]),
-                    if (index < snapshot.categories.length - 1)
-                      const SizedBox(height: AppSpace.md),
-                  ],
-                ],
-              );
-            },
-            loading: () => const Center(
-              child: Padding(
-                padding: EdgeInsets.symmetric(vertical: AppSpace.xl),
-                child: CircularProgressIndicator(),
-              ),
-            ),
-            error: (error, _) => _ErrorState(message: error.toString()),
-          ),
-        ],
-      ),
+      child: content,
     );
   }
 }
@@ -148,109 +111,90 @@ final class _CategoryScheduleCard extends StatelessWidget {
       GeneratedScheduleMode.knockoutPreview => AppPalette.apricot,
     };
 
-    return Container(
-      decoration: BoxDecoration(
-        color: AppPalette.surfaceSoft,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppPalette.line),
-      ),
+    return WorkspaceSurfaceCard(
+      accent: accent,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            height: 4,
-            decoration: BoxDecoration(
-              color: accent,
-              borderRadius: const BorderRadius.vertical(
-                top: Radius.circular(24),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(category.categoryName, style: theme.textTheme.titleLarge),
+              const SizedBox(height: AppSpace.xs),
+              Text(
+                category.mode.subtitle,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: AppPalette.inkSoft,
+                ),
               ),
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(AppSpace.lg),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(category.categoryName, style: theme.textTheme.titleLarge),
-                const SizedBox(height: AppSpace.xs),
-                Text(
-                  category.mode.subtitle,
-                  style: theme.textTheme.bodyMedium?.copyWith(
-                    color: AppPalette.inkSoft,
+              const SizedBox(height: AppSpace.md),
+              Wrap(
+                spacing: AppSpace.sm,
+                runSpacing: AppSpace.sm,
+                children: [
+                  WorkspaceTag(
+                    label: category.mode.label,
+                    background: accent.withValues(alpha: 0.16),
+                    foreground: AppPalette.ink,
                   ),
-                ),
-                const SizedBox(height: AppSpace.md),
-                Wrap(
-                  spacing: AppSpace.sm,
-                  runSpacing: AppSpace.sm,
-                  children: [
-                    _SummaryChip(
-                      label: category.mode.label,
-                      tint: accent.withValues(alpha: 0.16),
-                      border: accent.withValues(alpha: 0.35),
-                      foreground: AppPalette.ink,
+                  WorkspaceTag(
+                    label: '${category.teamCount} teams',
+                    background: AppPalette.skySoft,
+                    foreground: const Color(0xFF456F77),
+                  ),
+                  WorkspaceTag(
+                    label: '${category.playableMatchCount} matches',
+                    background: AppPalette.apricotSoft,
+                    foreground: const Color(0xFF8F6038),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppSpace.lg),
+              _SectionHeader(
+                title: category.groups.length > 1 ? 'Groups' : 'Seed order',
+              ),
+              const SizedBox(height: AppSpace.sm),
+              Wrap(
+                spacing: AppSpace.md,
+                runSpacing: AppSpace.md,
+                children: [
+                  for (final group in category.groups)
+                    _GroupCard(
+                      group: group,
+                      isMultiGroup: category.groups.length > 1,
                     ),
-                    _SummaryChip(
-                      label: '${category.teamCount} teams',
-                      tint: AppPalette.skySoft,
-                      border: AppPalette.sky.withValues(alpha: 0.35),
-                      foreground: const Color(0xFF456F77),
-                    ),
-                    _SummaryChip(
-                      label: '${category.playableMatchCount} matches',
-                      tint: AppPalette.apricotSoft,
-                      border: AppPalette.apricot.withValues(alpha: 0.35),
-                      foreground: const Color(0xFF8F6038),
-                    ),
+                ],
+              ),
+              const SizedBox(height: AppSpace.lg),
+              _SectionHeader(title: 'Round schedule'),
+              const SizedBox(height: AppSpace.sm),
+              Column(
+                children: [
+                  for (
+                    var roundIndex = 0;
+                    roundIndex < category.rounds.length;
+                    roundIndex++
+                  ) ...[
+                    _RoundCard(round: category.rounds[roundIndex]),
+                    if (roundIndex < category.rounds.length - 1)
+                      const SizedBox(height: AppSpace.md),
                   ],
-                ),
+                ],
+              ),
+              if (category.qualificationMatches.isNotEmpty) ...[
                 const SizedBox(height: AppSpace.lg),
-                _SectionHeader(
-                  title: category.groups.length > 1 ? 'Groups' : 'Seed order',
-                ),
+                const _SectionHeader(title: 'Qualification path'),
                 const SizedBox(height: AppSpace.sm),
                 Wrap(
                   spacing: AppSpace.md,
                   runSpacing: AppSpace.md,
                   children: [
-                    for (final group in category.groups)
-                      _GroupCard(
-                        group: group,
-                        isMultiGroup: category.groups.length > 1,
-                      ),
+                    for (final match in category.qualificationMatches)
+                      _QualificationCard(match: match),
                   ],
                 ),
-                const SizedBox(height: AppSpace.lg),
-                _SectionHeader(title: 'Round schedule'),
-                const SizedBox(height: AppSpace.sm),
-                Column(
-                  children: [
-                    for (
-                      var roundIndex = 0;
-                      roundIndex < category.rounds.length;
-                      roundIndex++
-                    ) ...[
-                      _RoundCard(round: category.rounds[roundIndex]),
-                      if (roundIndex < category.rounds.length - 1)
-                        const SizedBox(height: AppSpace.md),
-                    ],
-                  ],
-                ),
-                if (category.qualificationMatches.isNotEmpty) ...[
-                  const SizedBox(height: AppSpace.lg),
-                  const _SectionHeader(title: 'Qualification path'),
-                  const SizedBox(height: AppSpace.sm),
-                  Wrap(
-                    spacing: AppSpace.md,
-                    runSpacing: AppSpace.md,
-                    children: [
-                      for (final match in category.qualificationMatches)
-                        _QualificationCard(match: match),
-                    ],
-                  ),
-                ],
               ],
-            ),
+            ],
           ),
         ],
       ),
@@ -271,8 +215,8 @@ final class _GroupCard extends StatelessWidget {
       width: 280,
       padding: const EdgeInsets.all(AppSpace.md),
       decoration: BoxDecoration(
-        color: AppPalette.surface,
-        borderRadius: BorderRadius.circular(20),
+        color: AppPalette.surfaceSoft,
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppPalette.line),
       ),
       child: Column(
@@ -325,8 +269,8 @@ final class _RoundCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(AppSpace.md),
       decoration: BoxDecoration(
-        color: AppPalette.surface,
-        borderRadius: BorderRadius.circular(20),
+        color: AppPalette.surfaceSoft,
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppPalette.line),
       ),
       child: Column(
@@ -404,8 +348,8 @@ final class _QualificationCard extends StatelessWidget {
       width: 240,
       padding: const EdgeInsets.all(AppSpace.md),
       decoration: BoxDecoration(
-        color: AppPalette.surface,
-        borderRadius: BorderRadius.circular(20),
+        color: AppPalette.surfaceSoft,
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: AppPalette.line),
       ),
       child: Column(
@@ -430,38 +374,6 @@ final class _QualificationCard extends StatelessWidget {
   }
 }
 
-final class _SummaryChip extends StatelessWidget {
-  const _SummaryChip({
-    required this.label,
-    required this.tint,
-    required this.border,
-    required this.foreground,
-  });
-
-  final String label;
-  final Color tint;
-  final Color border;
-  final Color foreground;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: tint,
-        borderRadius: BorderRadius.circular(AppRadii.chip),
-        border: Border.all(color: border),
-      ),
-      child: Text(
-        label,
-        style: Theme.of(
-          context,
-        ).textTheme.bodySmall?.copyWith(color: foreground),
-      ),
-    );
-  }
-}
-
 final class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.title});
 
@@ -478,28 +390,10 @@ final class _EmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpace.xl),
-      decoration: BoxDecoration(
-        color: AppPalette.surfaceSoft,
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: AppPalette.line),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('No schedules yet', style: theme.textTheme.titleLarge),
-          const SizedBox(height: AppSpace.sm),
-          Text(
-            'Onboard at least two teams in a category to generate groupings and match rounds.',
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: AppPalette.inkSoft,
-            ),
-          ),
-        ],
-      ),
+    return const WorkspaceEmptyCard(
+      title: 'No schedules yet',
+      message:
+          'Onboard at least two teams in a category to generate groupings and match rounds.',
     );
   }
 }
@@ -511,33 +405,9 @@ final class _ErrorState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(AppSpace.lg),
-      decoration: BoxDecoration(
-        color: const Color(0x24C97D6B),
-        borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0x47C97D6B)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            'Scheduling needs attention',
-            style: theme.textTheme.titleLarge?.copyWith(
-              color: const Color(0xFF7B4D42),
-            ),
-          ),
-          const SizedBox(height: AppSpace.sm),
-          Text(
-            message,
-            style: theme.textTheme.bodyMedium?.copyWith(
-              color: const Color(0xFF7B4D42),
-            ),
-          ),
-        ],
-      ),
+    return WorkspaceErrorCard(
+      title: 'Scheduling needs attention',
+      message: message,
     );
   }
 }
