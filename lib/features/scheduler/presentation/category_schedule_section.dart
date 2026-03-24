@@ -26,7 +26,7 @@ final class CategoryScheduleSection extends ConsumerWidget {
         const WorkspaceSectionLead(
           title: 'Match flow',
           description:
-              'Generate category groups, rounds, and qualification paths from the teams you have already seeded.',
+              'Preview the derived pool structure, rounds, and knockout path from the saved seed order.',
           icon: Icons.calendar_view_week_rounded,
           accent: AppPalette.sageStrong,
         ),
@@ -110,8 +110,7 @@ final class _CategoryScheduleCard extends StatelessWidget {
     final theme = Theme.of(context);
     final accent = switch (category.mode) {
       GeneratedScheduleMode.roundRobinTop4 => AppPalette.sageStrong,
-      GeneratedScheduleMode.groupsTop2 => AppPalette.sky,
-      GeneratedScheduleMode.knockoutPreview => AppPalette.apricot,
+      GeneratedScheduleMode.groupsKnockout => AppPalette.sky,
     };
 
     return WorkspaceSurfaceCard(
@@ -140,6 +139,12 @@ final class _CategoryScheduleCard extends StatelessWidget {
                     background: accent.withValues(alpha: 0.16),
                     foreground: AppPalette.ink,
                   ),
+                  if (category.groups.length > 1)
+                    WorkspaceTag(
+                      label: '${category.groups.length} pools',
+                      background: AppPalette.surfaceSoft,
+                      foreground: const Color(0xFF365141),
+                    ),
                   WorkspaceTag(
                     label: '${category.teamCount} teams',
                     background: AppPalette.skySoft,
@@ -150,11 +155,17 @@ final class _CategoryScheduleCard extends StatelessWidget {
                     background: AppPalette.apricotSoft,
                     foreground: const Color(0xFF8F6038),
                   ),
+                  if (category.qualifierCount > 0)
+                    WorkspaceTag(
+                      label: category.qualificationSummary,
+                      background: AppPalette.oliveSoft,
+                      foreground: const Color(0xFF5F7243),
+                    ),
                 ],
               ),
               const SizedBox(height: AppSpace.lg),
               _SectionHeader(
-                title: category.groups.length > 1 ? 'Groups' : 'Seed order',
+                title: category.groups.length > 1 ? 'Pools' : 'Seed order',
               ),
               const SizedBox(height: AppSpace.sm),
               LayoutBuilder(
@@ -181,7 +192,11 @@ final class _CategoryScheduleCard extends StatelessWidget {
                 },
               ),
               const SizedBox(height: AppSpace.lg),
-              _SectionHeader(title: 'Round schedule'),
+              _SectionHeader(
+                title: category.groups.length > 1
+                    ? 'Pool schedule'
+                    : 'Round schedule',
+              ),
               const SizedBox(height: AppSpace.sm),
               Column(
                 children: [
@@ -198,7 +213,7 @@ final class _CategoryScheduleCard extends StatelessWidget {
               ),
               if (category.qualificationMatches.isNotEmpty) ...[
                 const SizedBox(height: AppSpace.lg),
-                const _SectionHeader(title: 'Qualification path'),
+                const _SectionHeader(title: 'Knockout path'),
                 const SizedBox(height: AppSpace.sm),
                 LayoutBuilder(
                   builder: (context, constraints) {
@@ -249,7 +264,7 @@ final class _GroupCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            isMultiGroup ? 'Group ${group.code}' : group.code,
+            isMultiGroup ? 'Pool ${group.code}' : group.code,
             style: theme.textTheme.titleMedium,
           ),
           const SizedBox(height: AppSpace.sm),

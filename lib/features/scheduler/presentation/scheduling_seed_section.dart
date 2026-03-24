@@ -3,10 +3,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/presentation/team_identity.dart';
 import '../../../theme/app_theme.dart';
-import '../../categories/domain/category_item.dart';
 import '../../entries/domain/entry.dart';
 import '../../tournaments/presentation/workspace_components.dart';
 import '../data/scheduling_seed_providers.dart';
+import '../domain/category_schedule.dart';
 import '../domain/scheduling_seed.dart';
 
 final class SchedulingSeedSection extends ConsumerStatefulWidget {
@@ -40,7 +40,7 @@ final class _SchedulingSeedSectionState
         const WorkspaceSectionLead(
           title: 'Seeding board',
           description:
-              'Adjust the live seed order per category and save it for scheduling.',
+              'Adjust the seed order that drives auto format, pool splits, and the knockout path.',
           icon: Icons.format_list_numbered_rounded,
           accent: AppPalette.apricot,
         ),
@@ -494,11 +494,17 @@ final class _EditableSeedCategoryCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final accent = switch (category.format) {
-      CategoryFormat.knockout => AppPalette.apricot,
-      CategoryFormat.group => AppPalette.sageStrong,
+    final preview = deriveCompetitionSchedule(
+      categoryId: category.categoryId,
+      categoryName: category.categoryName,
+      seededEntries: orderedEntries,
+      legacyFormat: category.format,
+    );
+    final mode = deriveCompetitionModeForSeedCount(orderedEntries.length);
+    final accent = switch (mode) {
+      GeneratedScheduleMode.roundRobinTop4 => AppPalette.sageStrong,
+      GeneratedScheduleMode.groupsKnockout => AppPalette.sky,
     };
-    final matchups = _buildDraftMatchups(orderedEntries);
     final actionRow = Wrap(
       spacing: AppSpace.sm,
       runSpacing: AppSpace.sm,
@@ -544,7 +550,7 @@ final class _EditableSeedCategoryCard extends StatelessWidget {
                   ),
                   const SizedBox(height: 2),
                   Text(
-                    '${category.formatLabel} · ${category.checkedInCount} checked in',
+                    '${mode.label} - ${orderedEntries.length} seeded teams',
                     style: theme.textTheme.bodyMedium?.copyWith(
                       color: AppPalette.inkSoft,
                     ),
@@ -553,12 +559,14 @@ final class _EditableSeedCategoryCard extends StatelessWidget {
               );
 
               final summaryLabel = [
-                category.formatLabel,
-                '${category.checkedInCount} checked in',
+                mode.label,
+                '${orderedEntries.length} seeded teams',
                 '${orderedEntries.length} slots',
+                if (preview != null && preview.groups.length > 1)
+                  '${preview.groups.length} pools',
                 if (needsSave) 'needs save',
                 if (isEdited) 'edited',
-              ].join(' · ');
+              ].join(' - ');
 
               if (isCompact) {
                 return Align(
@@ -617,17 +625,17 @@ final class _EditableSeedCategoryCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: AppSpace.md),
-          Text('Matchup preview', style: theme.textTheme.titleMedium),
+          Text('Competition preview', style: theme.textTheme.titleMedium),
           const SizedBox(height: AppSpace.xs),
-          Column(
-            children: [
-              for (var index = 0; index < matchups.length; index++) ...[
-                _MatchupPreviewTile(matchup: matchups[index]),
-                if (index < matchups.length - 1)
-                  const SizedBox(height: AppSpace.sm),
-              ],
-            ],
-          ),
+          if (preview == null)
+            Text(
+              'Add one more seeded team to preview the generated format.',
+              style: theme.textTheme.bodySmall?.copyWith(
+                color: AppPalette.inkSoft,
+              ),
+            )
+          else
+            _CompetitionPreview(preview: preview),
         ],
       ),
     );
@@ -717,56 +725,149 @@ final class _SeedEntryTile extends StatelessWidget {
   }
 }
 
-final class _MatchupPreviewTile extends StatelessWidget {
-  const _MatchupPreviewTile({required this.matchup});
+final class _CompetitionPreview extends StatelessWidget {
+  const _CompetitionPreview({required this.preview});
 
-  final _DraftMatchupPreview matchup;
+  final GeneratedCategorySchedule preview;
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final rowGradient = TeamIdentity.surfaceGradientForMatch(
-      matchup.teamOne,
-      matchup.teamTwo,
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Wrap(
+          spacing: AppSpace.sm,
+          runSpacing: AppSpace.sm,
+          children: [
+            WorkspaceTag(
+              label: preview.mode.label,
+              background: AppPalette.surfaceSoft,
+              foreground: AppPalette.ink,
+            ),
+            if (preview.groups.length > 1)
+              WorkspaceTag(
+                label: '${preview.groups.length} pools',
+                background: AppPalette.skySoft,
+                foreground: const Color(0xFF456F77),
+              ),
+            if (preview.qualifierCount > 0)
+              WorkspaceTag(
+                label: preview.qualificationSummary,
+                background: AppPalette.oliveSoft,
+                foreground: const Color(0xFF5F7243),
+              ),
+          ],
+        ),
+        if (preview.groups.length > 1) ...[
+          const SizedBox(height: AppSpace.sm),
+          Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            children: [
+              for (final group in preview.groups)
+                _SeedPreviewPoolChip(group: group),
+            ],
+          ),
+        ],
+        if (preview.qualificationMatches.isNotEmpty) ...[
+          const SizedBox(height: AppSpace.sm),
+          Column(
+            children: [
+              for (
+                var index = 0;
+                index < preview.qualificationMatches.length;
+                index++
+              ) ...[
+                _QualificationPreviewTile(
+                  match: preview.qualificationMatches[index],
+                ),
+                if (index < preview.qualificationMatches.length - 1)
+                  const SizedBox(height: AppSpace.xs),
+              ],
+            ],
+          ),
+        ] else ...[
+          const SizedBox(height: AppSpace.sm),
+          Text(
+            preview.mode.subtitle,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppPalette.inkSoft,
+            ),
+          ),
+        ],
+      ],
     );
-    final rowBorder = TeamIdentity.surfaceBorderForMatch(
-      matchup.teamOne,
-      matchup.teamTwo,
+  }
+}
+
+final class _SeedPreviewPoolChip extends StatelessWidget {
+  const _SeedPreviewPoolChip({required this.group});
+
+  final GeneratedScheduleGroup group;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.sm,
+        vertical: AppSpace.xs,
+      ),
+      decoration: BoxDecoration(
+        color: AppPalette.surfaceSoft,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppPalette.line),
+      ),
+      child: Text(
+        'Pool ${group.code}: ${group.entries.length}',
+        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+          color: AppPalette.inkSoft,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
+  }
+}
+
+final class _QualificationPreviewTile extends StatelessWidget {
+  const _QualificationPreviewTile({required this.match});
+
+  final GeneratedQualificationMatch match;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
 
     return Container(
       padding: const EdgeInsets.symmetric(
         horizontal: AppSpace.md,
-        vertical: AppSpace.sm,
+        vertical: AppSpace.xs,
       ),
       decoration: BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: rowGradient,
-        ),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: rowBorder),
+        color: AppPalette.surfaceSoft,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppPalette.line),
       ),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            width: 38,
-            height: 38,
-            alignment: Alignment.center,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppSpace.sm,
+              vertical: AppSpace.xs,
+            ),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.58),
-              borderRadius: BorderRadius.circular(13),
-              border: Border.all(
-                color: AppPalette.oliveStrong.withValues(alpha: 0.35),
-              ),
+              color: AppPalette.skySoft,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: AppPalette.sky.withValues(alpha: 0.24)),
             ),
             child: Text(
-              'M${matchup.matchNumber}',
-              style: AppTheme.numeric(
-                theme.textTheme.labelSmall,
-              ).copyWith(color: const Color(0xFF5F7243)),
+              match.label,
+              style: theme.textTheme.labelSmall?.copyWith(
+                color: const Color(0xFF456F77),
+                fontWeight: FontWeight.w700,
+              ),
             ),
           ),
           const SizedBox(width: AppSpace.sm),
@@ -774,50 +875,19 @@ final class _MatchupPreviewTile extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Row(
-                  children: [
-                    TeamIdentityAvatar(
-                      entry: matchup.teamOne,
-                      size: 24,
-                      radius: 9,
-                    ),
-                    const SizedBox(width: AppSpace.sm),
-                    Expanded(
-                      child: Text(
-                        matchup.teamOne.displayLabel,
-                        style: theme.textTheme.titleMedium,
-                      ),
-                    ),
-                  ],
+                Text(
+                  '${match.homeSource} vs ${match.awaySource}',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
-                if (!matchup.hasBye) ...[
-                  const SizedBox(height: AppSpace.xs),
-                  Row(
-                    children: [
-                      TeamIdentityAvatar(
-                        entry: matchup.teamTwo!,
-                        size: 24,
-                        radius: 9,
-                      ),
-                      const SizedBox(width: AppSpace.sm),
-                      Expanded(
-                        child: Text(
-                          matchup.teamTwo!.displayLabel,
-                          style: theme.textTheme.titleMedium,
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 2),
+                Text(
+                  match.stageLabel,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppPalette.inkSoft,
                   ),
-                ],
-                if (matchup.hasBye) ...[
-                  const SizedBox(height: AppSpace.xs),
-                  Text(
-                    'Waiting for one more team.',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: AppPalette.inkSoft,
-                    ),
-                  ),
-                ],
+                ),
               ],
             ),
           ),
@@ -825,20 +895,6 @@ final class _MatchupPreviewTile extends StatelessWidget {
       ),
     );
   }
-}
-
-final class _DraftMatchupPreview {
-  const _DraftMatchupPreview({
-    required this.matchNumber,
-    required this.teamOne,
-    required this.teamTwo,
-    required this.hasBye,
-  });
-
-  final int matchNumber;
-  final TournamentEntry teamOne;
-  final TournamentEntry? teamTwo;
-  final bool hasBye;
 }
 
 final class _SeedPositionInput extends StatefulWidget {
@@ -1170,22 +1226,6 @@ List<String> _normalizeSeedIds({
   }
 
   return List<String>.unmodifiable(normalized);
-}
-
-List<_DraftMatchupPreview> _buildDraftMatchups(
-  List<TournamentEntry> orderedEntries,
-) {
-  return [
-    for (var index = 0; index < orderedEntries.length; index += 2)
-      _DraftMatchupPreview(
-        matchNumber: (index ~/ 2) + 1,
-        teamOne: orderedEntries[index],
-        teamTwo: index + 1 < orderedEntries.length
-            ? orderedEntries[index + 1]
-            : null,
-        hasBye: index + 1 >= orderedEntries.length,
-      ),
-  ];
 }
 
 String _entryLabel(TournamentEntry entry) {
