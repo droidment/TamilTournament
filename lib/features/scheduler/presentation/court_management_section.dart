@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../theme/app_theme.dart';
 import '../../tournaments/presentation/workspace_components.dart';
 import '../data/court_providers.dart';
+import '../data/tournament_match_providers.dart';
 import '../domain/tournament_court.dart';
+import '../domain/tournament_match.dart';
 
 final class CourtManagementSection extends ConsumerStatefulWidget {
   const CourtManagementSection({
@@ -262,6 +264,7 @@ class _CourtManagementSectionState
   @override
   Widget build(BuildContext context) {
     final courts = ref.watch(tournamentCourtsProvider(widget.tournamentId));
+    final matches = ref.watch(tournamentMatchesProvider(widget.tournamentId));
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -325,6 +328,10 @@ class _CourtManagementSectionState
                         width: cardWidth,
                         child: _CourtCard(
                           court: court,
+                          assignedMatch: _assignedMatchForCourt(
+                            matches.asData?.value ?? const <TournamentMatch>[],
+                            court.id,
+                          ),
                           isBusy: _busyCourtIds.contains(court.id),
                           onToggleAvailability: () => _toggleCourt(court),
                           onEditDetails: () => _editCourtDetails(court),
@@ -360,6 +367,18 @@ class _CourtManagementSectionState
       child: content,
     );
   }
+}
+
+TournamentMatch? _assignedMatchForCourt(
+  List<TournamentMatch> matches,
+  String courtId,
+) {
+  for (final match in matches) {
+    if (match.assignedCourtId == courtId && match.isOnCourt) {
+      return match;
+    }
+  }
+  return null;
 }
 
 final class _CourtSetupBar extends StatelessWidget {
@@ -426,12 +445,14 @@ final class _CourtSetupBar extends StatelessWidget {
 final class _CourtCard extends StatelessWidget {
   const _CourtCard({
     required this.court,
+    required this.assignedMatch,
     required this.isBusy,
     required this.onToggleAvailability,
     required this.onEditDetails,
   });
 
   final TournamentCourt court;
+  final TournamentMatch? assignedMatch;
   final bool isBusy;
   final VoidCallback onToggleAvailability;
   final VoidCallback onEditDetails;
@@ -475,6 +496,41 @@ final class _CourtCard extends StatelessWidget {
                   : AppPalette.inkSoft,
             ),
           ),
+          if (assignedMatch != null) ...[
+            const SizedBox(height: AppSpace.md),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpace.md),
+              decoration: BoxDecoration(
+                color: AppPalette.surfaceSoft,
+                borderRadius: BorderRadius.circular(AppRadii.control),
+                border: Border.all(color: AppPalette.line),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Current match',
+                    style: theme.textTheme.labelLarge?.copyWith(
+                      color: AppPalette.inkSoft,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpace.xs),
+                  Text(
+                    assignedMatch!.categoryName,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: AppPalette.inkSoft,
+                    ),
+                  ),
+                  const SizedBox(height: AppSpace.sm),
+                  Text(
+                    '${assignedMatch!.teamOneLabel} vs ${assignedMatch!.teamTwoLabel}',
+                    style: theme.textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: AppSpace.md),
           Wrap(
             spacing: AppSpace.sm,

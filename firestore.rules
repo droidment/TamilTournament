@@ -121,6 +121,10 @@ service cloud.firestore {
         allow create, update: if isTournamentOrganizer(tournamentId)
           && validCourt();
       }
+
+      match /matches/{matchId} {
+        allow read, create, update, delete: if isTournamentOrganizer(tournamentId);
+      }
     }
 
     match /categories/{categoryId} {

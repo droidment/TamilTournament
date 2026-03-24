@@ -175,6 +175,16 @@ final class TournamentRepository {
     });
   }
 
+  Future<void> updateTournamentStatus({
+    required String tournamentId,
+    required TournamentStatus status,
+  }) async {
+    await _tournaments.doc(tournamentId).update(<String, Object>{
+      'status': status.value,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   bool _canAccessTournament({
     required Tournament tournament,
     required String organizerUid,

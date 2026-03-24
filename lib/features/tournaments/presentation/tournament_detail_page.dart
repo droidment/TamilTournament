@@ -11,6 +11,7 @@ import '../data/tournament_providers.dart';
 import '../domain/tournament.dart';
 import 'categories_section.dart';
 import 'organizers_section.dart';
+import 'tournament_start_panel.dart';
 import 'workspace_components.dart';
 
 enum _TournamentWorkspaceTab { setup, teams, seeding, schedule, courts }
@@ -1437,9 +1438,16 @@ final class _WorkspaceSection extends StatelessWidget {
         tournamentId: tournament.id,
         embedded: true,
       ),
-      _TournamentWorkspaceTab.schedule => CategoryScheduleSection(
-        tournamentId: tournament.id,
-        embedded: true,
+      _TournamentWorkspaceTab.schedule => Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          TournamentStartPanel(tournament: tournament),
+          const SizedBox(height: AppSpace.xl),
+          CategoryScheduleSection(
+            tournamentId: tournament.id,
+            embedded: true,
+          ),
+        ],
       ),
       _TournamentWorkspaceTab.courts => CourtManagementSection(
         tournamentId: tournament.id,

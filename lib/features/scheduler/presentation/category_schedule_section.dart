@@ -5,7 +5,11 @@ import '../../../shared/presentation/team_identity.dart';
 import '../../../theme/app_theme.dart';
 import '../../tournaments/presentation/workspace_components.dart';
 import '../data/category_schedule_providers.dart';
+import '../data/court_providers.dart';
+import '../data/tournament_match_providers.dart';
 import '../domain/category_schedule.dart';
+import '../domain/tournament_court.dart';
+import '../domain/tournament_match.dart';
 
 final class CategoryScheduleSection extends ConsumerStatefulWidget {
   const CategoryScheduleSection({
@@ -31,9 +35,18 @@ class _CategoryScheduleSectionState
     final state = ref.watch(
       categoryScheduleSnapshotProvider(widget.tournamentId),
     );
+    final matches = ref.watch(tournamentMatchesProvider(widget.tournamentId));
+    final courts = ref.watch(tournamentCourtsProvider(widget.tournamentId));
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (matches.hasValue && matches.requireValue.isNotEmpty) ...[
+          _LiveMatchBoard(
+            matches: matches.requireValue,
+            courts: courts.asData?.value ?? const <TournamentCourt>[],
+          ),
+          const SizedBox(height: AppSpace.xl),
+        ],
         const WorkspaceSectionLead(
           title: 'Match flow',
           description:
@@ -154,6 +167,317 @@ class _CategoryScheduleSectionState
       });
     });
     return snapshot.categories;
+  }
+}
+
+final class _LiveMatchBoard extends StatelessWidget {
+  const _LiveMatchBoard({required this.matches, required this.courts});
+
+  final List<TournamentMatch> matches;
+  final List<TournamentCourt> courts;
+
+  @override
+  Widget build(BuildContext context) {
+    final onCourt = matches.where((match) => match.isOnCourt).toList(growable: false);
+    final ready = matches.where((match) => match.isReady).toList(growable: false);
+    final completed = matches.where((match) => match.isCompleted).toList(growable: false);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const WorkspaceSectionLead(
+          title: 'Live schedule board',
+          description:
+              'Courts fill from the ready queue when the tournament launches. Use this board to scan what is on court now and what is next.',
+          icon: Icons.rocket_launch_rounded,
+          accent: AppPalette.sageStrong,
+        ),
+        const SizedBox(height: AppSpace.lg),
+        WorkspaceStatRail(
+          metrics: [
+            WorkspaceMetricItemData(
+              value: '${onCourt.length}',
+              label: 'on court',
+              foreground: const Color(0xFF365141),
+              isHighlighted: true,
+            ),
+            WorkspaceMetricItemData(
+              value: '${ready.length}',
+              label: 'ready queue',
+              foreground: const Color(0xFF456F77),
+            ),
+            WorkspaceMetricItemData(
+              value: '${completed.length}',
+              label: 'completed',
+              foreground: const Color(0xFF8F6038),
+            ),
+          ],
+        ),
+        const SizedBox(height: AppSpace.lg),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 820;
+            final columnWidth = isCompact
+                ? constraints.maxWidth
+                : (constraints.maxWidth - AppSpace.md) / 2;
+            return Wrap(
+              spacing: AppSpace.md,
+              runSpacing: AppSpace.md,
+              children: [
+                SizedBox(
+                  width: columnWidth,
+                  child: _LiveCourtBoard(
+                    matches: onCourt,
+                    courts: courts,
+                  ),
+                ),
+                SizedBox(
+                  width: columnWidth,
+                  child: _ReadyQueueBoard(matches: ready),
+                ),
+              ],
+            );
+          },
+        ),
+      ],
+    );
+  }
+}
+
+final class _LiveCourtBoard extends StatelessWidget {
+  const _LiveCourtBoard({required this.matches, required this.courts});
+
+  final List<TournamentMatch> matches;
+  final List<TournamentCourt> courts;
+
+  @override
+  Widget build(BuildContext context) {
+    final assignedByCourtId = <String, TournamentMatch>{
+      for (final match in matches)
+        if (match.assignedCourtId != null) match.assignedCourtId!: match,
+    };
+    final activeCourts = courts.where((court) => court.isAvailable).toList(growable: false);
+
+    return WorkspaceSurfaceCard(
+      accent: AppPalette.sageStrong,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Courts in play', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: AppSpace.sm),
+          if (assignedByCourtId.isEmpty)
+            Text(
+              'No live matches are assigned yet.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppPalette.inkSoft),
+            )
+          else
+            for (var index = 0; index < activeCourts.length; index++) ...[
+              _CourtMatchTile(
+                courtCode: activeCourts[index].code,
+                courtName: activeCourts[index].name,
+                match: assignedByCourtId[activeCourts[index].id],
+              ),
+              if (index < activeCourts.length - 1)
+                const SizedBox(height: AppSpace.sm),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+final class _ReadyQueueBoard extends StatelessWidget {
+  const _ReadyQueueBoard({required this.matches});
+
+  final List<TournamentMatch> matches;
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkspaceSurfaceCard(
+      accent: AppPalette.sky,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Ready queue', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: AppSpace.sm),
+          if (matches.isEmpty)
+            Text(
+              'Open courts will pull from this queue once matches are ready.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppPalette.inkSoft),
+            )
+          else
+            for (var index = 0; index < matches.length && index < 6; index++) ...[
+              _QueueMatchTile(match: matches[index]),
+              if (index < matches.length - 1 && index < 5)
+                const SizedBox(height: AppSpace.sm),
+            ],
+        ],
+      ),
+    );
+  }
+}
+
+final class _CourtMatchTile extends StatelessWidget {
+  const _CourtMatchTile({
+    required this.courtCode,
+    required this.courtName,
+    required this.match,
+  });
+
+  final String courtCode;
+  final String courtName;
+  final TournamentMatch? match;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentMatch = match;
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpace.md),
+      decoration: BoxDecoration(
+        color: AppPalette.surfaceSoft,
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        border: Border.all(color: AppPalette.line),
+      ),
+      child: currentMatch == null
+          ? Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('$courtCode · Open', style: Theme.of(context).textTheme.titleMedium),
+                const SizedBox(height: AppSpace.xs),
+                Text(
+                  courtName,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
+                ),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '$courtCode · ${currentMatch.matchCode}',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: AppSpace.xs),
+                Text(
+                  currentMatch.categoryName,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
+                ),
+                const SizedBox(height: AppSpace.sm),
+                _MatchTeamLine(
+                  label: currentMatch.teamOneLabel,
+                  detail: currentMatch.teamOneDetail,
+                ),
+                const SizedBox(height: AppSpace.xs),
+                _MatchTeamLine(
+                  label: currentMatch.teamTwoLabel,
+                  detail: currentMatch.teamTwoDetail,
+                ),
+              ],
+            ),
+    );
+  }
+}
+
+final class _QueueMatchTile extends StatelessWidget {
+  const _QueueMatchTile({required this.match});
+
+  final TournamentMatch match;
+
+  @override
+  Widget build(BuildContext context) {
+    final leftPalette = TeamIdentity.paletteForLabel(match.teamOneLabel);
+    final rightPalette = TeamIdentity.paletteForLabel(match.teamTwoLabel);
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpace.md),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            Color.alphaBlend(
+              leftPalette.background.withValues(alpha: 0.18),
+              AppPalette.surface,
+            ),
+            Color.alphaBlend(
+              rightPalette.backgroundStrong.withValues(alpha: 0.12),
+              AppPalette.surface,
+            ),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        border: Border.all(color: AppPalette.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(match.matchCode, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: AppSpace.xs),
+          Text(
+            match.categoryName,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
+          ),
+          const SizedBox(height: AppSpace.sm),
+          _MatchTeamLine(label: match.teamOneLabel, detail: match.teamOneDetail),
+          const SizedBox(height: AppSpace.xs),
+          _MatchTeamLine(label: match.teamTwoLabel, detail: match.teamTwoDetail),
+        ],
+      ),
+    );
+  }
+}
+
+final class _MatchTeamLine extends StatelessWidget {
+  const _MatchTeamLine({required this.label, required this.detail});
+
+  final String label;
+  final String detail;
+
+  @override
+  Widget build(BuildContext context) {
+    final palette = TeamIdentity.paletteForLabel(label);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 12,
+          height: 12,
+          margin: const EdgeInsets.only(top: 4),
+          decoration: BoxDecoration(
+            color: palette.accent.withValues(alpha: 0.8),
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: AppSpace.sm),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(label, style: Theme.of(context).textTheme.bodyMedium),
+              if (detail.trim().isNotEmpty)
+                Text(
+                  detail,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
   }
 }
 
