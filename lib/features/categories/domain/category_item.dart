@@ -27,6 +27,7 @@ final class CategoryItem {
     required this.format,
     required this.minPlayers,
     required this.checkedInPairs,
+    required this.isPublished,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -37,6 +38,7 @@ final class CategoryItem {
   final CategoryFormat format;
   final int minPlayers;
   final int checkedInPairs;
+  final bool isPublished;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -53,6 +55,7 @@ final class CategoryItem {
       format: CategoryFormatX.fromValue(data['format'] as String? ?? 'group'),
       minPlayers: (data['minPlayers'] as num?)?.toInt() ?? 2,
       checkedInPairs: (data['checkedInPairs'] as num?)?.toInt() ?? 0,
+      isPublished: data['isPublished'] as bool? ?? false,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
     );

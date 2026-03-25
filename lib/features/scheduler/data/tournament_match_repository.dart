@@ -4,6 +4,7 @@ import '../../tournaments/domain/tournament.dart';
 import '../domain/category_schedule.dart';
 import '../domain/tournament_court.dart';
 import '../domain/tournament_match.dart';
+import '../domain/tournament_standings.dart';
 
 final class TournamentLaunchResult {
   const TournamentLaunchResult({
@@ -27,18 +28,35 @@ final class TournamentMatchRepository {
         .collection('matches');
   }
 
+  CollectionReference<Map<String, dynamic>> _courts(String tournamentId) {
+    return _firestore
+        .collection('tournaments')
+        .doc(tournamentId)
+        .collection('courts');
+  }
+
   DocumentReference<Map<String, dynamic>> _tournament(String tournamentId) {
     return _firestore.collection('tournaments').doc(tournamentId);
   }
 
   Stream<List<TournamentMatch>> watchMatches(String tournamentId) {
-    return _matches(
-      tournamentId,
-    ).orderBy('displayOrder').snapshots().map((snapshot) {
+    return _matches(tournamentId).orderBy('displayOrder').snapshots().map((
+      snapshot,
+    ) {
       return snapshot.docs
           .map(TournamentMatch.fromDocument)
           .toList(growable: false);
     });
+  }
+
+  Future<List<TournamentWinnerSummary>> loadCompletedWinnerSummaries(
+    String tournamentId,
+  ) async {
+    final snapshot = await _matches(tournamentId).orderBy('displayOrder').get();
+    final matches = snapshot.docs
+        .map(TournamentMatch.fromDocument)
+        .toList(growable: false);
+    return deriveCompletedWinnerSummaries(matches);
   }
 
   Future<TournamentLaunchResult> launchTournament({
@@ -99,13 +117,13 @@ final class TournamentMatchRepository {
     await batch.commit();
     return TournamentLaunchResult(
       generatedMatches: matchDrafts.length,
-      assignedCourts: matchDrafts.where((draft) => draft.assignedCourtId != null).length,
+      assignedCourts: matchDrafts
+          .where((draft) => draft.assignedCourtId != null)
+          .length,
     );
   }
 
-  Future<void> resetTournamentLaunch({
-    required String tournamentId,
-  }) async {
+  Future<void> resetTournamentLaunch({required String tournamentId}) async {
     final existingSnapshot = await _matches(tournamentId).get();
     final batch = _firestore.batch();
     final now = FieldValue.serverTimestamp();
@@ -121,6 +139,217 @@ final class TournamentMatchRepository {
     });
 
     await batch.commit();
+  }
+
+  Future<void> saveMatchScores({
+    required String tournamentId,
+    required String matchId,
+    required List<MatchGameScore> scores,
+  }) async {
+    final matchRef = _matches(tournamentId).doc(matchId);
+    final snapshot = await matchRef.get();
+    if (!snapshot.exists) {
+      throw StateError('This match could not be found.');
+    }
+
+    final match = TournamentMatch.fromDocument(snapshot);
+    if (!match.isOnCourt) {
+      throw StateError('Only matches on court can be scored right now.');
+    }
+
+    await matchRef.update(<String, Object?>{
+      'scores': scores.map((score) => score.toMap()).toList(growable: false),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  Future<void> completeMatch({
+    required String tournamentId,
+    required String matchId,
+    required List<MatchGameScore> scores,
+  }) async {
+    final matchRef = _matches(tournamentId).doc(matchId);
+    final snapshot = await matchRef.get();
+    if (!snapshot.exists) {
+      throw StateError('This match could not be found.');
+    }
+
+    final match = TournamentMatch.fromDocument(snapshot);
+    if (!match.isOnCourt) {
+      throw StateError('Only matches on court can be finished.');
+    }
+
+    final outcome = deriveMatchScoreOutcome(match, scores);
+    if (outcome == null) {
+      throw StateError(
+        'Finish the score as a best-of-three result before closing the match.',
+      );
+    }
+
+    TournamentCourt? assignedCourt;
+    if (match.assignedCourtId != null) {
+      final courtSnapshot = await _courts(
+        tournamentId,
+      ).doc(match.assignedCourtId).get();
+      if (courtSnapshot.exists) {
+        assignedCourt = TournamentCourt.fromDocument(courtSnapshot);
+      }
+    }
+
+    QueryDocumentSnapshot<Map<String, dynamic>>? nextReadySnapshot;
+    if (assignedCourt?.isAvailable ?? false) {
+      final orderedSnapshot = await _matches(
+        tournamentId,
+      ).orderBy('displayOrder').get();
+      for (final doc in orderedSnapshot.docs) {
+        final candidate = TournamentMatch.fromDocument(doc);
+        if (candidate.isReady) {
+          nextReadySnapshot = doc;
+          break;
+        }
+      }
+    }
+
+    final now = FieldValue.serverTimestamp();
+    final batch = _firestore.batch();
+    batch.update(matchRef, <String, Object?>{
+      'scores': scores.map((score) => score.toMap()).toList(growable: false),
+      'winnerEntryId': outcome.winnerEntryId,
+      'winnerLabel': outcome.winnerLabel,
+      'status': TournamentMatchStatus.completed.value,
+      'completedAt': now,
+      'updatedAt': now,
+    });
+
+    if (nextReadySnapshot != null && assignedCourt != null) {
+      batch.update(nextReadySnapshot.reference, <String, Object?>{
+        'status': TournamentMatchStatus.onCourt.value,
+        'assignedCourtId': assignedCourt.id,
+        'assignedCourtCode': assignedCourt.code,
+        'assignedCourtName': assignedCourt.name,
+        'updatedAt': now,
+      });
+    }
+
+    await batch.commit();
+  }
+
+  Future<int> prepareNextKnockoutRound({
+    required String tournamentId,
+    required CategoryStandings standings,
+  }) async {
+    if (!standings.isPoolPhaseComplete) {
+      throw StateError('Finish all pool matches before setting up semifinals.');
+    }
+
+    final matchesSnapshot = await _matches(
+      tournamentId,
+    ).orderBy('displayOrder').get();
+    final categoryMatches = matchesSnapshot.docs
+        .map(TournamentMatch.fromDocument)
+        .where((match) => match.categoryId == standings.categoryId)
+        .toList(growable: false);
+    final matchById = <String, QueryDocumentSnapshot<Map<String, dynamic>>>{
+      for (final doc in matchesSnapshot.docs) doc.id: doc,
+    };
+
+    final sourceEntries = <String, _ResolvedEntry>{
+      for (final source in standings.qualificationSources.entries)
+        source.key: _ResolvedEntry.fromStanding(source.value),
+    };
+
+    for (final match in categoryMatches.where((match) => match.isCompleted)) {
+      final winnerToken = _winnerTokenForMatch(match);
+      if (winnerToken == null ||
+          match.winnerEntryId == null ||
+          match.winnerEntryId!.trim().isEmpty) {
+        continue;
+      }
+      sourceEntries[winnerToken] = _ResolvedEntry(
+        entryId: match.winnerEntryId!,
+        label: match.winnerLabel ?? '',
+        detail: match.winnerEntryId == match.teamOneEntryId
+            ? match.teamOneDetail
+            : match.teamTwoDetail,
+      );
+    }
+
+    final pendingKnockoutMatches = categoryMatches
+        .where((match) => match.phase == 'knockout' && match.isPending)
+        .toList(growable: false);
+    if (pendingKnockoutMatches.isEmpty) {
+      return 0;
+    }
+
+    String? targetStage;
+    final toResolve = <TournamentMatch>[];
+    for (final match in pendingKnockoutMatches) {
+      final home = sourceEntries[match.teamOneLabel];
+      final away = sourceEntries[match.teamTwoLabel];
+      if (home == null || away == null) {
+        continue;
+      }
+      targetStage ??= match.stageLabel;
+      if (match.stageLabel != targetStage) {
+        continue;
+      }
+      toResolve.add(match);
+    }
+
+    if (toResolve.isEmpty) {
+      throw StateError(
+        'Semifinal slots are not ready yet from current standings.',
+      );
+    }
+
+    final courtsSnapshot = await _courts(
+      tournamentId,
+    ).orderBy('orderIndex').get();
+    final courts = courtsSnapshot.docs
+        .map(TournamentCourt.fromDocument)
+        .where((court) => court.isAvailable)
+        .toList(growable: false);
+    final occupiedCourtIds = categoryMatches
+        .where((match) => match.isOnCourt && match.assignedCourtId != null)
+        .map((match) => match.assignedCourtId!)
+        .toSet();
+    final openCourts = courts
+        .where((court) => !occupiedCourtIds.contains(court.id))
+        .toList(growable: false);
+
+    final batch = _firestore.batch();
+    final now = FieldValue.serverTimestamp();
+
+    for (var index = 0; index < toResolve.length; index++) {
+      final match = toResolve[index];
+      final doc = matchById[match.id];
+      if (doc == null) {
+        continue;
+      }
+      final home = sourceEntries[match.teamOneLabel]!;
+      final away = sourceEntries[match.teamTwoLabel]!;
+      final assignedCourt = index < openCourts.length
+          ? openCourts[index]
+          : null;
+      batch.update(doc.reference, <String, Object?>{
+        'teamOneEntryId': home.entryId,
+        'teamOneLabel': home.label,
+        'teamOneDetail': home.detail,
+        'teamTwoEntryId': away.entryId,
+        'teamTwoLabel': away.label,
+        'teamTwoDetail': away.detail,
+        'status': assignedCourt == null
+            ? TournamentMatchStatus.ready.value
+            : TournamentMatchStatus.onCourt.value,
+        'assignedCourtId': assignedCourt?.id,
+        'assignedCourtCode': assignedCourt?.code,
+        'assignedCourtName': assignedCourt?.name,
+        'updatedAt': now,
+      });
+    }
+
+    await batch.commit();
+    return toResolve.length;
   }
 }
 
@@ -188,10 +417,50 @@ final class _MatchDraft {
       'assignedCourtId': assignedCourtId,
       'assignedCourtCode': assignedCourtCode,
       'assignedCourtName': assignedCourtName,
+      'scores': const <Map<String, Object>>[],
+      'winnerEntryId': null,
+      'winnerLabel': null,
       'createdAt': now,
+      'completedAt': null,
       'updatedAt': now,
     };
   }
+}
+
+final class _ResolvedEntry {
+  const _ResolvedEntry({
+    required this.entryId,
+    required this.label,
+    required this.detail,
+  });
+
+  final String entryId;
+  final String label;
+  final String detail;
+
+  factory _ResolvedEntry.fromStanding(StandingRow row) {
+    return _ResolvedEntry(
+      entryId: row.entry.id,
+      label: row.entry.displayLabel,
+      detail: row.entry.rosterLabel,
+    );
+  }
+}
+
+String? _winnerTokenForMatch(TournamentMatch match) {
+  final normalizedCode = match.matchCode.toLowerCase();
+  final numberMatch = RegExp(r'(\d+)$').firstMatch(normalizedCode);
+  if (numberMatch == null) {
+    return null;
+  }
+  final number = numberMatch.group(1);
+  if (normalizedCode.contains('semifinal')) {
+    return 'Winner SF$number';
+  }
+  if (normalizedCode.contains('quarterfinal')) {
+    return 'Winner QF$number';
+  }
+  return null;
 }
 
 List<_MatchDraft> _buildMatchDrafts({

@@ -15,10 +15,12 @@ final class EntriesSection extends ConsumerStatefulWidget {
     super.key,
     required this.tournamentId,
     this.embedded = false,
+    this.readOnly = false,
   });
 
   final String tournamentId;
   final bool embedded;
+  final bool readOnly;
 
   @override
   ConsumerState<EntriesSection> createState() => _EntriesSectionState();
@@ -272,7 +274,7 @@ class _EntriesSectionState extends ConsumerState<EntriesSection> {
           icon: Icons.groups_rounded,
           accent: AppPalette.oliveStrong,
           trailing: FilledButton(
-            onPressed: canCreateEntry
+            onPressed: !widget.readOnly && canCreateEntry
                 ? () => _showCreateEntryDialog(
                     categories: categoryItems,
                     existingEntries: entries.asData?.value ?? const [],
@@ -373,6 +375,7 @@ class _EntriesSectionState extends ConsumerState<EntriesSection> {
                 for (var index = 0; index < sortedItems.length; index++) ...[
                   _EntryRowCard(
                     entry: sortedItems[index],
+                    readOnly: widget.readOnly,
                     isBusy: _busyEntryIds.contains(sortedItems[index].id),
                     onToggleCheckedIn: () =>
                         _toggleCheckedIn(sortedItems[index]),
@@ -728,6 +731,7 @@ class _CreateEntryDraftDialogState extends State<_CreateEntryDraftDialog> {
 final class _EntryRowCard extends StatelessWidget {
   const _EntryRowCard({
     required this.entry,
+    required this.readOnly,
     required this.isBusy,
     required this.onToggleCheckedIn,
     required this.onEdit,
@@ -735,6 +739,7 @@ final class _EntryRowCard extends StatelessWidget {
   });
 
   final TournamentEntry entry;
+  final bool readOnly;
   final bool isBusy;
   final VoidCallback onToggleCheckedIn;
   final VoidCallback onEdit;
@@ -816,14 +821,14 @@ final class _EntryRowCard extends StatelessWidget {
                       label: 'Edit',
                       icon: Icons.edit_outlined,
                       compact: isCompact,
-                      onTap: isBusy ? null : onEdit,
+                      onTap: isBusy || readOnly ? null : onEdit,
                     ),
                     _EntryActionLink(
                       label: 'Delete',
                       icon: Icons.delete_outline_rounded,
                       compact: isCompact,
                       destructive: true,
-                      onTap: isBusy ? null : onDelete,
+                      onTap: isBusy || readOnly ? null : onDelete,
                     ),
                   ],
                 );
@@ -846,7 +851,7 @@ final class _EntryRowCard extends StatelessWidget {
                             const Spacer(),
                             _CheckInControl(
                               checkedIn: entry.checkedIn,
-                              isBusy: isBusy,
+                              isBusy: isBusy || readOnly,
                               onToggle: onToggleCheckedIn,
                             ),
                           ],
@@ -866,7 +871,7 @@ final class _EntryRowCard extends StatelessWidget {
                           const SizedBox(width: AppSpace.sm),
                           _CompactEntryUtilities(
                             checkedIn: entry.checkedIn,
-                            isBusy: isBusy,
+                            isBusy: isBusy || readOnly,
                             onToggleCheckedIn: onToggleCheckedIn,
                             actionRow: actionRow,
                           ),

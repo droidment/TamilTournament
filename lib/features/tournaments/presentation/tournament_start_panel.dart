@@ -8,6 +8,7 @@ import '../../scheduler/data/tournament_match_providers.dart';
 import '../../scheduler/domain/category_schedule.dart';
 import '../../scheduler/domain/tournament_court.dart';
 import '../../scheduler/domain/tournament_match.dart';
+import '../data/tournament_providers.dart';
 import '../domain/tournament.dart';
 import 'workspace_components.dart';
 
@@ -189,6 +190,79 @@ class _TournamentStartPanelState extends ConsumerState<TournamentStartPanel> {
     }
   }
 
+  Future<void> _completeTournament(_TournamentLaunchState launchState) async {
+    if (_isSubmitting || !launchState.canComplete) {
+      return;
+    }
+
+    final shouldComplete = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppPalette.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.panel),
+          side: const BorderSide(color: AppPalette.line),
+        ),
+        title: const Text('Wrap up tournament'),
+        content: Text(
+          'This will mark the tournament as completed and lock the organizer workspace into read-only mode.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppPalette.inkSoft),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('Complete tournament'),
+          ),
+        ],
+      ),
+    );
+
+    if (shouldComplete != true || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _isSubmitting = true;
+    });
+
+    try {
+      await ref
+          .read(tournamentRepositoryProvider)
+          .updateTournamentStatus(
+            tournamentId: widget.tournament.id,
+            status: TournamentStatus.completed,
+          );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Tournament completed. Workspace is now read-only.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSubmitting = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final schedule = ref.watch(
@@ -209,9 +283,11 @@ class _TournamentStartPanelState extends ConsumerState<TournamentStartPanel> {
       TournamentStatus.live => AppPalette.sageStrong,
       TournamentStatus.completed => AppPalette.oliveStrong,
     };
-    final canStart = launchState.canStart &&
+    final canStart =
+        launchState.canStart &&
         widget.tournament.status != TournamentStatus.completed;
     final isLive = widget.tournament.status == TournamentStatus.live;
+    final isCompleted = widget.tournament.status == TournamentStatus.completed;
     final theme = Theme.of(context);
 
     return WorkspaceSurfaceCard(
@@ -267,7 +343,11 @@ class _TournamentStartPanelState extends ConsumerState<TournamentStartPanel> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            isLive ? 'Tournament live' : 'Tournament launch',
+                            isCompleted
+                                ? 'Tournament complete'
+                                : isLive
+                                ? 'Tournament live'
+                                : 'Tournament launch',
                             style: isCompact
                                 ? theme.textTheme.headlineLarge?.copyWith(
                                     fontWeight: FontWeight.w700,
@@ -280,7 +360,9 @@ class _TournamentStartPanelState extends ConsumerState<TournamentStartPanel> {
                           ConstrainedBox(
                             constraints: const BoxConstraints(maxWidth: 560),
                             child: Text(
-                              isLive
+                              isCompleted
+                                  ? 'Play is finished. Use standings and results to review the final tournament outcome.'
+                                  : isLive
                                   ? 'Live play is active. Keep courts available and use match flow to manage the day.'
                                   : 'Start the tournament once at least one category has playable matches and at least one court is active.',
                               style: theme.textTheme.bodyMedium?.copyWith(
@@ -296,39 +378,42 @@ class _TournamentStartPanelState extends ConsumerState<TournamentStartPanel> {
                               spacing: AppSpace.sm,
                               runSpacing: AppSpace.sm,
                               children: [
-                                SizedBox(
-                                  width: isCompact ? double.infinity : 260,
-                                  child: FilledButton.icon(
-                                    onPressed: canStart && !_isSubmitting
-                                        ? () => _startTournament(launchState)
-                                        : null,
-                                    icon: Icon(
-                                      isLive
-                                          ? Icons.autorenew_rounded
-                                          : Icons.rocket_launch_rounded,
-                                      size: 18,
-                                    ),
-                                    style: FilledButton.styleFrom(
-                                      padding: EdgeInsets.symmetric(
-                                        horizontal: AppSpace.lg,
-                                        vertical: isCompact
-                                            ? AppSpace.md
-                                            : AppSpace.lg,
+                                if (!isCompleted)
+                                  SizedBox(
+                                    width: isCompact ? double.infinity : 260,
+                                    child: FilledButton.icon(
+                                      onPressed: canStart && !_isSubmitting
+                                          ? () => _startTournament(launchState)
+                                          : null,
+                                      icon: Icon(
+                                        isLive
+                                            ? Icons.autorenew_rounded
+                                            : Icons.rocket_launch_rounded,
+                                        size: 18,
                                       ),
-                                      textStyle: theme.textTheme.titleMedium
-                                          ?.copyWith(fontWeight: FontWeight.w700),
-                                    ),
-                                    label: Text(
-                                      isLive
-                                          ? launchState.matchCount > 0
-                                                ? 'Rebuild live schedule'
-                                                : 'Generate live schedule'
-                                          : _isSubmitting
-                                              ? 'Starting tournament...'
-                                              : 'Start tournament',
+                                      style: FilledButton.styleFrom(
+                                        padding: EdgeInsets.symmetric(
+                                          horizontal: AppSpace.lg,
+                                          vertical: isCompact
+                                              ? AppSpace.md
+                                              : AppSpace.lg,
+                                        ),
+                                        textStyle: theme.textTheme.titleMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w700,
+                                            ),
+                                      ),
+                                      label: Text(
+                                        isLive
+                                            ? launchState.matchCount > 0
+                                                  ? 'Rebuild live schedule'
+                                                  : 'Generate live schedule'
+                                            : _isSubmitting
+                                            ? 'Starting tournament...'
+                                            : 'Start tournament',
+                                      ),
                                     ),
                                   ),
-                                ),
                                 if (isLive)
                                   SizedBox(
                                     width: isCompact ? double.infinity : 200,
@@ -347,10 +432,27 @@ class _TournamentStartPanelState extends ConsumerState<TournamentStartPanel> {
                                       child: const Text('Return to setup'),
                                     ),
                                   ),
+                                if (isLive && launchState.canComplete)
+                                  SizedBox(
+                                    width: isCompact ? double.infinity : 220,
+                                    child: FilledButton(
+                                      onPressed: _isSubmitting
+                                          ? null
+                                          : () => _completeTournament(
+                                              launchState,
+                                            ),
+                                      style: FilledButton.styleFrom(
+                                        backgroundColor: AppPalette.oliveStrong,
+                                      ),
+                                      child: const Text('Complete tournament'),
+                                    ),
+                                  ),
                               ],
                             ),
                           ),
-                          if (isLive && launchState.matchCount > 0) ...[
+                          if (!isCompleted &&
+                              isLive &&
+                              launchState.matchCount > 0) ...[
                             const SizedBox(height: AppSpace.sm),
                             Text(
                               '${launchState.matchCount} live match records currently staged.',
@@ -409,7 +511,7 @@ class _TournamentStartPanelState extends ConsumerState<TournamentStartPanel> {
             ),
             const SizedBox(height: AppSpace.md),
           ],
-          if (!isLive && launchState.blockers.isNotEmpty) ...[
+          if (!isCompleted && !isLive && launchState.blockers.isNotEmpty) ...[
             for (final blocker in launchState.blockers) ...[
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -436,6 +538,13 @@ class _TournamentStartPanelState extends ConsumerState<TournamentStartPanel> {
               if (blocker != launchState.blockers.last)
                 const SizedBox(height: AppSpace.xs),
             ],
+          ] else if (isLive && !launchState.canComplete) ...[
+            Text(
+              'Complete every staged match before wrapping up the tournament.',
+              style: Theme.of(
+                context,
+              ).textTheme.bodyMedium?.copyWith(color: AppPalette.inkSoft),
+            ),
           ],
         ],
       ),
@@ -448,6 +557,9 @@ final class _TournamentLaunchState {
     required this.readyCategories,
     required this.playableMatches,
     required this.activeCourts,
+    required this.pendingMatches,
+    required this.readyMatches,
+    required this.onCourtMatches,
     required this.schedulePending,
     required this.courtsPending,
     required this.blockers,
@@ -459,6 +571,9 @@ final class _TournamentLaunchState {
   final int readyCategories;
   final int playableMatches;
   final int activeCourts;
+  final int pendingMatches;
+  final int readyMatches;
+  final int onCourtMatches;
   final bool schedulePending;
   final bool courtsPending;
   final List<String> blockers;
@@ -467,6 +582,13 @@ final class _TournamentLaunchState {
   final int matchCount;
 
   bool get canStart => blockers.isEmpty && !schedulePending && !courtsPending;
+  int get incompleteMatchCount =>
+      pendingMatches + readyMatches + onCourtMatches;
+  bool get canComplete =>
+      matchCount > 0 &&
+      !schedulePending &&
+      !courtsPending &&
+      incompleteMatchCount == 0;
 }
 
 _TournamentLaunchState _deriveLaunchState({
@@ -487,11 +609,14 @@ _TournamentLaunchState _deriveLaunchState({
           0,
           (sum, category) => sum + category.playableMatchCount,
         );
-  final activeCourts = courts.asData?.value
-          .where((court) => court.isAvailable)
-          .length ??
+  final activeCourts =
+      courts.asData?.value.where((court) => court.isAvailable).length ??
       tournament.activeCourtCount;
-  final matchCount = matches.asData?.value.length ?? 0;
+  final matchList = matches.asData?.value ?? const <TournamentMatch>[];
+  final matchCount = matchList.length;
+  final pendingMatches = matchList.where((match) => match.isPending).length;
+  final readyMatches = matchList.where((match) => match.isReady).length;
+  final onCourtMatches = matchList.where((match) => match.isOnCourt).length;
 
   final blockers = <String>[];
   if (readyCategories == 0 || playableMatches == 0) {
@@ -507,6 +632,9 @@ _TournamentLaunchState _deriveLaunchState({
     readyCategories: readyCategories,
     playableMatches: playableMatches,
     activeCourts: activeCourts,
+    pendingMatches: pendingMatches,
+    readyMatches: readyMatches,
+    onCourtMatches: onCourtMatches,
     schedulePending: schedule.isLoading && !schedule.hasValue,
     courtsPending: courts.isLoading && !courts.hasValue,
     blockers: blockers,

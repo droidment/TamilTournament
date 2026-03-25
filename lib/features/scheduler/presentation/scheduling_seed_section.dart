@@ -14,10 +14,12 @@ final class SchedulingSeedSection extends ConsumerStatefulWidget {
     super.key,
     required this.tournamentId,
     this.embedded = false,
+    this.readOnly = false,
   });
 
   final String tournamentId;
   final bool embedded;
+  final bool readOnly;
 
   @override
   ConsumerState<SchedulingSeedSection> createState() =>
@@ -123,6 +125,7 @@ final class _SchedulingSeedSectionState
                   index++
                 ) ...[
                   _EditableSeedCategoryCard(
+                    readOnly: widget.readOnly,
                     category: visibleCategories[index],
                     orderedEntries: _orderedEntries(visibleCategories[index]),
                     isEdited: _isCategoryEdited(visibleCategories[index]),
@@ -507,6 +510,7 @@ final class _SchedulingSeedSectionState
 
 final class _EditableSeedCategoryCard extends StatelessWidget {
   const _EditableSeedCategoryCard({
+    required this.readOnly,
     required this.category,
     required this.orderedEntries,
     required this.isEdited,
@@ -518,6 +522,7 @@ final class _EditableSeedCategoryCard extends StatelessWidget {
     required this.onSaveCategory,
   });
 
+  final bool readOnly;
   final ReadyCategorySeed category;
   final List<TournamentEntry> orderedEntries;
   final bool isEdited;
@@ -548,12 +553,15 @@ final class _EditableSeedCategoryCard extends StatelessWidget {
       alignment: WrapAlignment.end,
       children: [
         OutlinedButton(
-          onPressed: onAutoSeedCategory,
+          onPressed: readOnly ? null : onAutoSeedCategory,
           child: const Text('Auto-seed'),
         ),
-        OutlinedButton(onPressed: onResetCategory, child: const Text('Reset')),
+        OutlinedButton(
+          onPressed: readOnly ? null : onResetCategory,
+          child: const Text('Reset'),
+        ),
         FilledButton(
-          onPressed: isSaving
+          onPressed: readOnly || isSaving
               ? null
               : () async {
                   FocusManager.instance.primaryFocus?.unfocus();
@@ -646,6 +654,7 @@ final class _EditableSeedCategoryCard extends StatelessWidget {
             children: [
               for (var index = 0; index < orderedEntries.length; index++) ...[
                 _SeedEntryTile(
+                  readOnly: readOnly,
                   entry: orderedEntries[index],
                   currentSeedNumber: index + 1,
                   originalSeedNumber:
@@ -681,12 +690,14 @@ final class _EditableSeedCategoryCard extends StatelessWidget {
 
 final class _SeedEntryTile extends StatelessWidget {
   const _SeedEntryTile({
+    required this.readOnly,
     required this.entry,
     required this.currentSeedNumber,
     required this.originalSeedNumber,
     required this.onSeedSubmitted,
   });
 
+  final bool readOnly;
   final TournamentEntry entry;
   final int currentSeedNumber;
   final int originalSeedNumber;
@@ -720,6 +731,7 @@ final class _SeedEntryTile extends StatelessWidget {
           _SeedPositionInput(
             value: currentSeedNumber,
             accent: palette.accent,
+            enabled: !readOnly,
             onSubmitted: onSeedSubmitted,
           ),
           const SizedBox(width: AppSpace.sm),
@@ -938,11 +950,13 @@ final class _SeedPositionInput extends StatefulWidget {
   const _SeedPositionInput({
     required this.value,
     required this.accent,
+    required this.enabled,
     required this.onSubmitted,
   });
 
   final int value;
   final Color accent;
+  final bool enabled;
   final ValueChanged<int> onSubmitted;
 
   @override
@@ -1000,6 +1014,7 @@ final class _SeedPositionInputState extends State<_SeedPositionInput> {
             child: TextField(
               controller: _controller,
               focusNode: _focusNode,
+              enabled: widget.enabled,
               keyboardType: TextInputType.number,
               textInputAction: TextInputAction.done,
               textAlign: TextAlign.center,
@@ -1041,7 +1056,7 @@ final class _SeedPositionInputState extends State<_SeedPositionInput> {
           Tooltip(
             message: 'Apply seed order',
             child: InkResponse(
-              onTap: _submit,
+              onTap: widget.enabled ? _submit : null,
               radius: 18,
               child: Container(
                 width: 28,

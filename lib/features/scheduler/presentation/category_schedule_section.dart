@@ -178,9 +178,15 @@ final class _LiveMatchBoard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final onCourt = matches.where((match) => match.isOnCourt).toList(growable: false);
-    final ready = matches.where((match) => match.isReady).toList(growable: false);
-    final completed = matches.where((match) => match.isCompleted).toList(growable: false);
+    final onCourt = matches
+        .where((match) => match.isOnCourt)
+        .toList(growable: false);
+    final ready = matches
+        .where((match) => match.isReady)
+        .toList(growable: false);
+    final completed = matches
+        .where((match) => match.isCompleted)
+        .toList(growable: false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -226,10 +232,7 @@ final class _LiveMatchBoard extends StatelessWidget {
               children: [
                 SizedBox(
                   width: columnWidth,
-                  child: _LiveCourtBoard(
-                    matches: onCourt,
-                    courts: courts,
-                  ),
+                  child: _LiveCourtBoard(matches: onCourt, courts: courts),
                 ),
                 SizedBox(
                   width: columnWidth,
@@ -256,7 +259,9 @@ final class _LiveCourtBoard extends StatelessWidget {
       for (final match in matches)
         if (match.assignedCourtId != null) match.assignedCourtId!: match,
     };
-    final activeCourts = courts.where((court) => court.isAvailable).toList(growable: false);
+    final activeCourts = courts
+        .where((court) => court.isAvailable)
+        .toList(growable: false);
 
     return WorkspaceSurfaceCard(
       accent: AppPalette.sageStrong,
@@ -310,7 +315,11 @@ final class _ReadyQueueBoard extends StatelessWidget {
               ).textTheme.bodyMedium?.copyWith(color: AppPalette.inkSoft),
             )
           else
-            for (var index = 0; index < matches.length && index < 6; index++) ...[
+            for (
+              var index = 0;
+              index < matches.length && index < 6;
+              index++
+            ) ...[
               _QueueMatchTile(match: matches[index]),
               if (index < matches.length - 1 && index < 5)
                 const SizedBox(height: AppSpace.sm),
@@ -347,7 +356,10 @@ final class _CourtMatchTile extends StatelessWidget {
           ? Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text('$courtCode · Open', style: Theme.of(context).textTheme.titleMedium),
+                Text(
+                  '$courtCode · Open',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
                 const SizedBox(height: AppSpace.xs),
                 Text(
                   courtName,
@@ -381,6 +393,10 @@ final class _CourtMatchTile extends StatelessWidget {
                   label: currentMatch.teamTwoLabel,
                   detail: currentMatch.teamTwoDetail,
                 ),
+                if (currentMatch.hasScores) ...[
+                  const SizedBox(height: AppSpace.sm),
+                  _LiveScoreStrip(match: currentMatch),
+                ],
               ],
             ),
     );
@@ -429,11 +445,50 @@ final class _QueueMatchTile extends StatelessWidget {
             ).textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
           ),
           const SizedBox(height: AppSpace.sm),
-          _MatchTeamLine(label: match.teamOneLabel, detail: match.teamOneDetail),
+          _MatchTeamLine(
+            label: match.teamOneLabel,
+            detail: match.teamOneDetail,
+          ),
           const SizedBox(height: AppSpace.xs),
-          _MatchTeamLine(label: match.teamTwoLabel, detail: match.teamTwoDetail),
+          _MatchTeamLine(
+            label: match.teamTwoLabel,
+            detail: match.teamTwoDetail,
+          ),
+          if (match.hasScores) ...[
+            const SizedBox(height: AppSpace.sm),
+            _LiveScoreStrip(match: match),
+          ],
         ],
       ),
+    );
+  }
+}
+
+final class _LiveScoreStrip extends StatelessWidget {
+  const _LiveScoreStrip({required this.match});
+
+  final TournamentMatch match;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: AppSpace.xs,
+      runSpacing: AppSpace.xs,
+      children: [
+        for (final score in match.scores)
+          WorkspaceTag(
+            label:
+                'G${score.gameNumber} ${score.teamOnePoints}-${score.teamTwoPoints}',
+            background: AppPalette.surface,
+            foreground: AppPalette.inkSoft,
+          ),
+        if (match.winnerLabel != null && match.winnerLabel!.trim().isNotEmpty)
+          WorkspaceTag(
+            label: match.winnerLabel!,
+            background: AppPalette.sageSoft,
+            foreground: const Color(0xFF365141),
+          ),
+      ],
     );
   }
 }

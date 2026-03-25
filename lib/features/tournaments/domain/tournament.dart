@@ -64,6 +64,9 @@ final class Tournament {
     required this.status,
     required this.activeCourtCount,
     required this.stats,
+    required this.publicSlug,
+    required this.isPublic,
+    required this.publicStatus,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -77,6 +80,9 @@ final class Tournament {
   final TournamentStatus status;
   final int activeCourtCount;
   final TournamentStats stats;
+  final String? publicSlug;
+  final bool isPublic;
+  final String? publicStatus;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -102,6 +108,9 @@ final class Tournament {
       ),
       activeCourtCount: (data['activeCourtCount'] as num?)?.toInt() ?? 0,
       stats: TournamentStats.fromMap(data['stats'] as Map<String, dynamic>?),
+      publicSlug: data['publicSlug'] as String?,
+      isPublic: data['isPublic'] as bool? ?? false,
+      publicStatus: data['publicStatus'] as String?,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
     );

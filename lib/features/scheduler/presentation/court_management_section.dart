@@ -14,11 +14,13 @@ final class CourtManagementSection extends ConsumerStatefulWidget {
     required this.tournamentId,
     required this.initialCourtCount,
     this.embedded = false,
+    this.readOnly = false,
   });
 
   final String tournamentId;
   final int initialCourtCount;
   final bool embedded;
+  final bool readOnly;
 
   @override
   ConsumerState<CourtManagementSection> createState() =>
@@ -31,6 +33,7 @@ class _CourtManagementSectionState
   int? _lastSyncedConfiguredCourtCount;
   bool _isGenerating = false;
   final Set<String> _busyCourtIds = <String>{};
+  final Set<String> _busyMatchIds = <String>{};
 
   @override
   void initState() {
@@ -228,6 +231,64 @@ class _CourtManagementSectionState
     }
   }
 
+  Future<void> _scoreMatch(TournamentCourt court, TournamentMatch match) async {
+    final result = await showDialog<_ScoreDialogResult>(
+      context: context,
+      builder: (context) => _ScoreMatchDialog(match: match, court: court),
+    );
+
+    if (result == null || !mounted) {
+      return;
+    }
+
+    setState(() {
+      _busyMatchIds.add(match.id);
+    });
+
+    try {
+      final repository = ref.read(tournamentMatchRepositoryProvider);
+      if (result.finishMatch) {
+        await repository.completeMatch(
+          tournamentId: widget.tournamentId,
+          matchId: match.id,
+          scores: result.scores,
+        );
+      } else {
+        await repository.saveMatchScores(
+          tournamentId: widget.tournamentId,
+          matchId: match.id,
+          scores: result.scores,
+        );
+      }
+
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            result.finishMatch
+                ? '${match.matchCode} finished and the court queue moved forward.'
+                : 'Saved score for ${match.matchCode}.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_friendlyError(error))));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busyMatchIds.remove(match.id);
+        });
+      }
+    }
+  }
+
   void _syncConfiguredCourtCount(List<TournamentCourt> courts) {
     if (_isGenerating || courts.isEmpty) {
       return;
@@ -303,7 +364,7 @@ class _CourtManagementSectionState
         _CourtSetupBar(
           controller: _courtCountController,
           isGenerating: _isGenerating,
-          onGenerate: _generateCourts,
+          onGenerate: widget.readOnly ? null : _generateCourts,
         ),
         const SizedBox(height: AppSpace.lg),
         courts.when(
@@ -324,18 +385,29 @@ class _CourtManagementSectionState
                   runSpacing: AppSpace.md,
                   children: [
                     for (final court in items)
-                      SizedBox(
-                        width: cardWidth,
-                        child: _CourtCard(
-                          court: court,
-                          assignedMatch: _assignedMatchForCourt(
+                      Builder(
+                        builder: (context) {
+                          final assignedMatch = _assignedMatchForCourt(
                             matches.asData?.value ?? const <TournamentMatch>[],
                             court.id,
-                          ),
-                          isBusy: _busyCourtIds.contains(court.id),
-                          onToggleAvailability: () => _toggleCourt(court),
-                          onEditDetails: () => _editCourtDetails(court),
-                        ),
+                          );
+                          return SizedBox(
+                            width: cardWidth,
+                            child: _CourtCard(
+                              court: court,
+                              assignedMatch: assignedMatch,
+                              isBusy: _busyCourtIds.contains(court.id),
+                              isScoring:
+                                  assignedMatch != null &&
+                                  _busyMatchIds.contains(assignedMatch.id),
+                              readOnly: widget.readOnly,
+                              onToggleAvailability: () => _toggleCourt(court),
+                              onEditDetails: () => _editCourtDetails(court),
+                              onScoreMatch: (match) =>
+                                  _scoreMatch(court, match),
+                            ),
+                          );
+                        },
                       ),
                   ],
                 );
@@ -378,6 +450,7 @@ TournamentMatch? _assignedMatchForCourt(
       return match;
     }
   }
+
   return null;
 }
 
@@ -390,7 +463,7 @@ final class _CourtSetupBar extends StatelessWidget {
 
   final TextEditingController controller;
   final bool isGenerating;
-  final VoidCallback onGenerate;
+  final VoidCallback? onGenerate;
 
   @override
   Widget build(BuildContext context) {
@@ -446,16 +519,22 @@ final class _CourtCard extends StatelessWidget {
   const _CourtCard({
     required this.court,
     required this.assignedMatch,
+    required this.readOnly,
     required this.isBusy,
+    required this.isScoring,
     required this.onToggleAvailability,
     required this.onEditDetails,
+    required this.onScoreMatch,
   });
 
   final TournamentCourt court;
   final TournamentMatch? assignedMatch;
+  final bool readOnly;
   final bool isBusy;
+  final bool isScoring;
   final VoidCallback onToggleAvailability;
   final VoidCallback onEditDetails;
+  final ValueChanged<TournamentMatch> onScoreMatch;
 
   @override
   Widget build(BuildContext context) {
@@ -527,6 +606,23 @@ final class _CourtCard extends StatelessWidget {
                     '${assignedMatch!.teamOneLabel} vs ${assignedMatch!.teamTwoLabel}',
                     style: theme.textTheme.bodyMedium,
                   ),
+                  if (assignedMatch!.hasScores) ...[
+                    const SizedBox(height: AppSpace.sm),
+                    _ScoreSummaryStrip(
+                      scores: assignedMatch!.scores,
+                      winnerLabel: assignedMatch!.winnerLabel,
+                    ),
+                  ],
+                  const SizedBox(height: AppSpace.sm),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: readOnly || isScoring
+                          ? null
+                          : () => onScoreMatch(assignedMatch!),
+                      child: Text(isScoring ? 'Saving...' : 'Enter score'),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -537,11 +633,11 @@ final class _CourtCard extends StatelessWidget {
             runSpacing: AppSpace.sm,
             children: [
               OutlinedButton(
-                onPressed: isBusy ? null : onEditDetails,
+                onPressed: isBusy || readOnly ? null : onEditDetails,
                 child: const Text('Edit court'),
               ),
               FilledButton(
-                onPressed: isBusy ? null : onToggleAvailability,
+                onPressed: isBusy || readOnly ? null : onToggleAvailability,
                 child: Text(
                   isBusy
                       ? 'Updating...'
@@ -571,6 +667,36 @@ final class _CourtEmptyState extends StatelessWidget {
   }
 }
 
+final class _ScoreSummaryStrip extends StatelessWidget {
+  const _ScoreSummaryStrip({required this.scores, required this.winnerLabel});
+
+  final List<MatchGameScore> scores;
+  final String? winnerLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    return Wrap(
+      spacing: AppSpace.xs,
+      runSpacing: AppSpace.xs,
+      children: [
+        for (final score in scores)
+          WorkspaceTag(
+            label:
+                'G${score.gameNumber} ${score.teamOnePoints}-${score.teamTwoPoints}',
+            background: AppPalette.surface,
+            foreground: AppPalette.inkSoft,
+          ),
+        if (winnerLabel != null && winnerLabel!.trim().isNotEmpty)
+          WorkspaceTag(
+            label: winnerLabel!,
+            background: AppPalette.sageSoft,
+            foreground: const Color(0xFF365141),
+          ),
+      ],
+    );
+  }
+}
+
 final class _CourtErrorState extends StatelessWidget {
   const _CourtErrorState({required this.message});
 
@@ -585,10 +711,266 @@ final class _CourtErrorState extends StatelessWidget {
 String _friendlyError(Object error) {
   final message = error.toString();
   if (message.contains('permission-denied')) {
-    return 'This organizer account cannot update court availability yet. Reload and try again.';
+    return 'This organizer account cannot update live results yet. Reload and try again.';
   }
   if (message.contains('failed-precondition')) {
     return 'Court data is not ready yet in this environment. Try again in a moment.';
   }
   return message;
+}
+
+final class _ScoreDialogResult {
+  const _ScoreDialogResult({required this.scores, required this.finishMatch});
+
+  final List<MatchGameScore> scores;
+  final bool finishMatch;
+}
+
+final class _ScoreMatchDialog extends StatefulWidget {
+  const _ScoreMatchDialog({required this.match, required this.court});
+
+  final TournamentMatch match;
+  final TournamentCourt court;
+
+  @override
+  State<_ScoreMatchDialog> createState() => _ScoreMatchDialogState();
+}
+
+class _ScoreMatchDialogState extends State<_ScoreMatchDialog> {
+  late final List<TextEditingController> _teamOneControllers;
+  late final List<TextEditingController> _teamTwoControllers;
+  String? _errorText;
+
+  @override
+  void initState() {
+    super.initState();
+    _teamOneControllers = List<TextEditingController>.generate(3, (index) {
+      final score = widget.match.scores.length > index
+          ? widget.match.scores[index].teamOnePoints
+          : null;
+      return TextEditingController(text: score?.toString() ?? '');
+    });
+    _teamTwoControllers = List<TextEditingController>.generate(3, (index) {
+      final score = widget.match.scores.length > index
+          ? widget.match.scores[index].teamTwoPoints
+          : null;
+      return TextEditingController(text: score?.toString() ?? '');
+    });
+  }
+
+  @override
+  void dispose() {
+    for (final controller in _teamOneControllers) {
+      controller.dispose();
+    }
+    for (final controller in _teamTwoControllers) {
+      controller.dispose();
+    }
+    super.dispose();
+  }
+
+  void _submit({required bool finishMatch}) {
+    final scores = <MatchGameScore>[];
+
+    for (var index = 0; index < 3; index++) {
+      final leftRaw = _teamOneControllers[index].text.trim();
+      final rightRaw = _teamTwoControllers[index].text.trim();
+      if (leftRaw.isEmpty && rightRaw.isEmpty) {
+        continue;
+      }
+
+      final left = int.tryParse(leftRaw);
+      final right = int.tryParse(rightRaw);
+      if (left == null || right == null) {
+        setState(() {
+          _errorText = 'Enter both scores for each saved game.';
+        });
+        return;
+      }
+      if (left < 0 || right < 0) {
+        setState(() {
+          _errorText = 'Scores cannot be negative.';
+        });
+        return;
+      }
+      if (left == right) {
+        setState(() {
+          _errorText = 'Games cannot end level.';
+        });
+        return;
+      }
+
+      scores.add(
+        MatchGameScore(
+          gameNumber: index + 1,
+          teamOnePoints: left,
+          teamTwoPoints: right,
+        ),
+      );
+    }
+
+    if (finishMatch) {
+      final outcome = deriveMatchScoreOutcome(widget.match, scores);
+      if (outcome == null) {
+        setState(() {
+          _errorText =
+              'Finish requires a best-of-three result with one side winning two games.';
+        });
+        return;
+      }
+    }
+
+    Navigator.of(
+      context,
+    ).pop(_ScoreDialogResult(scores: scores, finishMatch: finishMatch));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return AlertDialog(
+      backgroundColor: AppPalette.surface,
+      surfaceTintColor: Colors.transparent,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        side: const BorderSide(color: AppPalette.line),
+      ),
+      title: Text('${widget.match.matchCode} · ${widget.court.code}'),
+      content: SizedBox(
+        width: 460,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              widget.match.categoryName,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppPalette.inkSoft,
+              ),
+            ),
+            const SizedBox(height: AppSpace.md),
+            _DialogTeamHeader(
+              teamOneLabel: widget.match.teamOneLabel,
+              teamTwoLabel: widget.match.teamTwoLabel,
+            ),
+            const SizedBox(height: AppSpace.md),
+            for (var index = 0; index < 3; index++) ...[
+              _GameScoreRow(
+                label: 'Game ${index + 1}',
+                leftController: _teamOneControllers[index],
+                rightController: _teamTwoControllers[index],
+              ),
+              if (index < 2) const SizedBox(height: AppSpace.sm),
+            ],
+            if (_errorText != null) ...[
+              const SizedBox(height: AppSpace.md),
+              Text(
+                _errorText!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                  color: AppPalette.apricot,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        OutlinedButton(
+          onPressed: () => _submit(finishMatch: false),
+          child: const Text('Save score'),
+        ),
+        FilledButton(
+          onPressed: () => _submit(finishMatch: true),
+          child: const Text('Finish match'),
+        ),
+      ],
+    );
+  }
+}
+
+final class _DialogTeamHeader extends StatelessWidget {
+  const _DialogTeamHeader({
+    required this.teamOneLabel,
+    required this.teamTwoLabel,
+  });
+
+  final String teamOneLabel;
+  final String teamTwoLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        Expanded(child: Text(teamOneLabel, style: theme.textTheme.titleMedium)),
+        const SizedBox(width: AppSpace.md),
+        Expanded(
+          child: Text(
+            teamTwoLabel,
+            textAlign: TextAlign.end,
+            style: theme.textTheme.titleMedium,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+final class _GameScoreRow extends StatelessWidget {
+  const _GameScoreRow({
+    required this.label,
+    required this.leftController,
+    required this.rightController,
+  });
+
+  final String label;
+  final TextEditingController leftController;
+  final TextEditingController rightController;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return Row(
+      children: [
+        SizedBox(
+          width: 72,
+          child: Text(
+            label,
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppPalette.inkSoft,
+            ),
+          ),
+        ),
+        Expanded(
+          child: TextField(
+            controller: leftController,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            decoration: const InputDecoration(hintText: '21', isDense: true),
+          ),
+        ),
+        const SizedBox(width: AppSpace.sm),
+        Text(
+          '-',
+          style: theme.textTheme.titleMedium?.copyWith(
+            color: AppPalette.inkSoft,
+          ),
+        ),
+        const SizedBox(width: AppSpace.sm),
+        Expanded(
+          child: TextField(
+            controller: rightController,
+            keyboardType: TextInputType.number,
+            textAlign: TextAlign.center,
+            decoration: const InputDecoration(hintText: '17', isDense: true),
+          ),
+        ),
+      ],
+    );
+  }
 }

@@ -43,6 +43,41 @@ service cloud.firestore {
       );
     }
 
+    function getTournamentRole(tournamentId) {
+      return get(/databases/$(database)/documents/tournaments/$(tournamentId)/roles/$(request.auth.uid));
+    }
+
+    function hasTournamentRole(tournamentId, role) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/roles/$(request.auth.uid))
+        && getTournamentRole(tournamentId).data.role == role
+        && getTournamentRole(tournamentId).data.isActive == true;
+    }
+
+    function hasAnyTournamentRole(tournamentId) {
+      return signedIn()
+        && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/roles/$(request.auth.uid))
+        && getTournamentRole(tournamentId).data.isActive == true;
+    }
+
+    function isTournamentAssistant(tournamentId) {
+      return isTournamentOrganizer(tournamentId)
+        || hasTournamentRole(tournamentId, 'assistant');
+    }
+
+    function isTournamentReferee(tournamentId) {
+      return hasTournamentRole(tournamentId, 'referee');
+    }
+
+    function isTournamentStaff(tournamentId) {
+      return isTournamentOrganizer(tournamentId)
+        || hasAnyTournamentRole(tournamentId);
+    }
+
+    function isPublicTournament(tournamentId) {
+      return get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.isPublic == true;
+    }
+
     function validOrganizerEmails() {
       return request.resource.data.organizerEmails is list
         && request.resource.data.organizerEmails.size() > 0;
@@ -59,15 +94,23 @@ service cloud.firestore {
         && validOrganizerEmails()
         && organizerEmail() in request.resource.data.organizerEmails
         && validTournamentStatus();
-      allow read: if hasTournamentAccess(resource.data);
+      allow read: if hasTournamentAccess(resource.data)
+        || resource.data.isPublic == true;
       allow update: if hasTournamentAccess(resource.data)
         && request.resource.data.organizerUid == resource.data.organizerUid
         && organizerEmailsValidForUpdate()
         && validTournamentStatus();
       allow delete: if hasTournamentAccess(resource.data);
 
+      match /roles/{roleId} {
+        allow read: if isTournamentStaff(tournamentId);
+        allow create, update, delete: if isTournamentOrganizer(tournamentId);
+      }
+
       match /entries/{entryId} {
-        allow read, create, update, delete: if isTournamentOrganizer(tournamentId);
+        allow read: if isTournamentStaff(tournamentId)
+          || isPublicTournament(tournamentId);
+        allow create, update, delete: if isTournamentOrganizer(tournamentId);
       }
 
       match /seedPlans/{categoryId} {
@@ -117,19 +160,37 @@ service cloud.firestore {
             && request.resource.data.note is string;
         }
 
-        allow read, delete: if isTournamentOrganizer(tournamentId);
+        allow read: if isTournamentStaff(tournamentId)
+          || isPublicTournament(tournamentId);
+        allow delete: if isTournamentOrganizer(tournamentId);
         allow create, update: if isTournamentOrganizer(tournamentId)
           && validCourt();
       }
 
       match /matches/{matchId} {
-        allow read, create, update, delete: if isTournamentOrganizer(tournamentId);
+        allow read: if isTournamentStaff(tournamentId)
+          || isPublicTournament(tournamentId);
+        allow create, delete: if isTournamentOrganizer(tournamentId);
+        allow update: if isTournamentOrganizer(tournamentId)
+          || isTournamentAssistant(tournamentId);
+      }
+
+      match /scoreSubmissions/{submissionId} {
+        allow read: if isTournamentAssistant(tournamentId);
+        allow create: if isTournamentStaff(tournamentId)
+          && request.resource.data.matchId is string
+          && request.resource.data.submittedByUserId == request.auth.uid
+          && request.resource.data.approvalStatus == 'pending';
+        allow update: if isTournamentAssistant(tournamentId)
+          && request.resource.data.approvalStatus in ['approved', 'rejected'];
       }
     }
 
     match /categories/{categoryId} {
       allow create: if isTournamentOrganizer(request.resource.data.tournamentId);
-      allow read, update, delete: if isTournamentOrganizer(resource.data.tournamentId);
+      allow read: if isTournamentOrganizer(resource.data.tournamentId)
+        || isTournamentAssistant(resource.data.tournamentId);
+      allow update, delete: if isTournamentOrganizer(resource.data.tournamentId);
     }
 
     match /{document=**} {

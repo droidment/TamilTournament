@@ -12,6 +12,7 @@ void main() {
       format: CategoryFormat.group,
       minPlayers: 2,
       checkedInPairs: 0,
+      isPublished: false,
       createdAt: null,
       updatedAt: null,
     );
@@ -39,6 +40,7 @@ void main() {
       format: CategoryFormat.group,
       minPlayers: 2,
       checkedInPairs: 0,
+      isPublished: false,
       createdAt: null,
       updatedAt: null,
     );

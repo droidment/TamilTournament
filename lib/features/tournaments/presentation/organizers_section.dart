@@ -11,11 +11,13 @@ final class OrganizersSection extends ConsumerStatefulWidget {
   const OrganizersSection({
     required this.tournament,
     this.embedded = false,
+    this.readOnly = false,
     super.key,
   });
 
   final Tournament tournament;
   final bool embedded;
+  final bool readOnly;
 
   @override
   ConsumerState<OrganizersSection> createState() => _OrganizersSectionState();
@@ -110,7 +112,9 @@ class _OrganizersSectionState extends ConsumerState<OrganizersSection> {
           icon: Icons.admin_panel_settings_outlined,
           accent: AppPalette.sky,
           trailing: FilledButton.icon(
-            onPressed: _isAddingOrganizer ? null : _showAddOrganizerDialog,
+            onPressed: widget.readOnly || _isAddingOrganizer
+                ? null
+                : _showAddOrganizerDialog,
             icon: _isAddingOrganizer
                 ? const SizedBox(
                     width: 16,

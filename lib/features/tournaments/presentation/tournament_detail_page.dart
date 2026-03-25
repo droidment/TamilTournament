@@ -7,6 +7,7 @@ import '../../entries/presentation/entries_section.dart';
 import '../../scheduler/presentation/category_schedule_section.dart';
 import '../../scheduler/presentation/court_management_section.dart';
 import '../../scheduler/presentation/scheduling_seed_section.dart';
+import '../../scheduler/presentation/standings_section.dart';
 import '../data/tournament_providers.dart';
 import '../domain/tournament.dart';
 import 'categories_section.dart';
@@ -14,7 +15,14 @@ import 'organizers_section.dart';
 import 'tournament_start_panel.dart';
 import 'workspace_components.dart';
 
-enum _TournamentWorkspaceTab { setup, teams, seeding, schedule, courts }
+enum _TournamentWorkspaceTab {
+  setup,
+  teams,
+  seeding,
+  schedule,
+  standings,
+  courts,
+}
 
 extension on _TournamentWorkspaceTab {
   String get label => switch (this) {
@@ -22,6 +30,7 @@ extension on _TournamentWorkspaceTab {
     _TournamentWorkspaceTab.teams => 'Teams',
     _TournamentWorkspaceTab.seeding => 'Seeding',
     _TournamentWorkspaceTab.schedule => 'Schedule',
+    _TournamentWorkspaceTab.standings => 'Standings',
     _TournamentWorkspaceTab.courts => 'Courts',
   };
 
@@ -30,6 +39,7 @@ extension on _TournamentWorkspaceTab {
     _TournamentWorkspaceTab.teams => 'Team desk',
     _TournamentWorkspaceTab.seeding => 'Seeding board',
     _TournamentWorkspaceTab.schedule => 'Match flow',
+    _TournamentWorkspaceTab.standings => 'Standings',
     _TournamentWorkspaceTab.courts => 'Court desk',
   };
 
@@ -38,6 +48,7 @@ extension on _TournamentWorkspaceTab {
     _TournamentWorkspaceTab.teams => Icons.groups_rounded,
     _TournamentWorkspaceTab.seeding => Icons.format_list_numbered_rounded,
     _TournamentWorkspaceTab.schedule => Icons.calendar_view_week_rounded,
+    _TournamentWorkspaceTab.standings => Icons.leaderboard_rounded,
     _TournamentWorkspaceTab.courts => Icons.sports_tennis_rounded,
   };
 
@@ -46,6 +57,7 @@ extension on _TournamentWorkspaceTab {
     _TournamentWorkspaceTab.teams => AppPalette.oliveStrong,
     _TournamentWorkspaceTab.seeding => AppPalette.apricot,
     _TournamentWorkspaceTab.schedule => AppPalette.sageStrong,
+    _TournamentWorkspaceTab.standings => AppPalette.sky,
     _TournamentWorkspaceTab.courts => const Color(0xFF618374),
   };
 
@@ -54,6 +66,7 @@ extension on _TournamentWorkspaceTab {
     _TournamentWorkspaceTab.teams => const Color(0xFFE8F2E8),
     _TournamentWorkspaceTab.seeding => AppPalette.apricotSoft,
     _TournamentWorkspaceTab.schedule => AppPalette.sageSoft,
+    _TournamentWorkspaceTab.standings => AppPalette.skySoft,
     _TournamentWorkspaceTab.courts => const Color(0xFFE7F0EA),
   };
 
@@ -62,6 +75,7 @@ extension on _TournamentWorkspaceTab {
     _TournamentWorkspaceTab.teams => const Color(0xFFF3F7EF),
     _TournamentWorkspaceTab.seeding => const Color(0xFFF8F1E4),
     _TournamentWorkspaceTab.schedule => const Color(0xFFEFF7F2),
+    _TournamentWorkspaceTab.standings => const Color(0xFFEFF7FA),
     _TournamentWorkspaceTab.courts => const Color(0xFFF2F7F4),
   };
 
@@ -70,6 +84,7 @@ extension on _TournamentWorkspaceTab {
     _TournamentWorkspaceTab.teams => const Color(0xFF45533D),
     _TournamentWorkspaceTab.seeding => const Color(0xFF6E5841),
     _TournamentWorkspaceTab.schedule => const Color(0xFF365447),
+    _TournamentWorkspaceTab.standings => const Color(0xFF355A62),
     _TournamentWorkspaceTab.courts => const Color(0xFF314A3D),
   };
 
@@ -78,6 +93,7 @@ extension on _TournamentWorkspaceTab {
     _TournamentWorkspaceTab.teams => const Color(0xFF5B6B51),
     _TournamentWorkspaceTab.seeding => const Color(0xFF8B6F52),
     _TournamentWorkspaceTab.schedule => const Color(0xFF47685A),
+    _TournamentWorkspaceTab.standings => const Color(0xFF4D7380),
     _TournamentWorkspaceTab.courts => const Color(0xFF456053),
   };
 
@@ -86,6 +102,7 @@ extension on _TournamentWorkspaceTab {
     _TournamentWorkspaceTab.teams => 'Team desk',
     _TournamentWorkspaceTab.seeding => 'Seeding board',
     _TournamentWorkspaceTab.schedule => 'Match flow',
+    _TournamentWorkspaceTab.standings => 'Standings',
     _TournamentWorkspaceTab.courts => 'Court desk',
   };
 
@@ -98,6 +115,8 @@ extension on _TournamentWorkspaceTab {
       'Assign order and prepare the draw before play starts.',
     _TournamentWorkspaceTab.schedule =>
       'Stage matches, monitor queues, and keep rounds moving.',
+    _TournamentWorkspaceTab.standings =>
+      'Track table movement, qualification lines, and progression pressure.',
     _TournamentWorkspaceTab.courts =>
       'Track active courts, open slots, and readiness on the floor.',
   };
@@ -216,6 +235,7 @@ final class _TournamentDetailBody extends StatelessWidget {
     _TournamentWorkspaceTab.teams,
     _TournamentWorkspaceTab.seeding,
     _TournamentWorkspaceTab.schedule,
+    _TournamentWorkspaceTab.standings,
     _TournamentWorkspaceTab.courts,
   ];
 
@@ -337,6 +357,8 @@ final class _WorkspaceTabBanner extends StatelessWidget {
             '${tournament.stats.entries} entries to order',
           _TournamentWorkspaceTab.schedule =>
             '${tournament.stats.matches} matches tracked',
+          _TournamentWorkspaceTab.standings =>
+            '${tournament.stats.categories} tables in view',
           _TournamentWorkspaceTab.courts =>
             '${tournament.activeCourtCount} courts active',
           _TournamentWorkspaceTab.setup =>
@@ -1421,40 +1443,75 @@ final class _WorkspaceSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final readOnly = tournament.status == TournamentStatus.completed;
     return switch (tab) {
       _TournamentWorkspaceTab.setup => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          OrganizersSection(tournament: tournament, embedded: true),
+          if (readOnly) ...[
+            const _ReadOnlyBanner(),
+            const SizedBox(height: AppSpace.xl),
+          ],
+          OrganizersSection(
+            tournament: tournament,
+            embedded: true,
+            readOnly: readOnly,
+          ),
           const SizedBox(height: AppSpace.xl),
-          CategoriesSection(tournamentId: tournament.id, embedded: true),
+          CategoriesSection(
+            tournamentId: tournament.id,
+            embedded: true,
+            readOnly: readOnly,
+          ),
         ],
       ),
       _TournamentWorkspaceTab.teams => EntriesSection(
         tournamentId: tournament.id,
         embedded: true,
+        readOnly: readOnly,
       ),
       _TournamentWorkspaceTab.seeding => SchedulingSeedSection(
         tournamentId: tournament.id,
         embedded: true,
+        readOnly: readOnly,
       ),
       _TournamentWorkspaceTab.schedule => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           TournamentStartPanel(tournament: tournament),
           const SizedBox(height: AppSpace.xl),
-          CategoryScheduleSection(
-            tournamentId: tournament.id,
-            embedded: true,
-          ),
+          CategoryScheduleSection(tournamentId: tournament.id, embedded: true),
         ],
+      ),
+      _TournamentWorkspaceTab.standings => StandingsSection(
+        tournamentId: tournament.id,
+        embedded: true,
+        readOnly: readOnly,
       ),
       _TournamentWorkspaceTab.courts => CourtManagementSection(
         tournamentId: tournament.id,
         initialCourtCount: tournament.activeCourtCount,
         embedded: true,
+        readOnly: readOnly,
       ),
     };
+  }
+}
+
+final class _ReadOnlyBanner extends StatelessWidget {
+  const _ReadOnlyBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkspaceSurfaceCard(
+      accent: AppPalette.oliveStrong,
+      child: Text(
+        'Tournament is completed. The workspace is now read-only.',
+        style: Theme.of(
+          context,
+        ).textTheme.bodyMedium?.copyWith(color: AppPalette.inkSoft),
+      ),
+    );
   }
 }
 
@@ -1575,6 +1632,8 @@ String _navMetric(_TournamentWorkspaceTab tab, Tournament tournament) {
     _TournamentWorkspaceTab.teams => '${tournament.stats.entries} teams',
     _TournamentWorkspaceTab.seeding => '${tournament.stats.entries} entries',
     _TournamentWorkspaceTab.schedule => '${tournament.stats.matches} matches',
+    _TournamentWorkspaceTab.standings =>
+      '${tournament.stats.categories} tables',
     _TournamentWorkspaceTab.courts =>
       '${tournament.activeCourtCount} active courts',
   };

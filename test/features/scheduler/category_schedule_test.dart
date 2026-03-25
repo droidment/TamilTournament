@@ -123,6 +123,7 @@ CategoryItem _category(String id, String name) {
     format: CategoryFormat.group,
     minPlayers: 2,
     checkedInPairs: 0,
+    isPublished: false,
     createdAt: null,
     updatedAt: null,
   );

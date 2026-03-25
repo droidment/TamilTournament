@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../scheduler/data/tournament_match_providers.dart';
+import '../../scheduler/domain/tournament_match.dart';
 import '../../../theme/app_theme.dart';
 import '../data/tournament_providers.dart';
 import '../domain/tournament.dart';
@@ -331,13 +333,13 @@ class _CreateTournamentDraftDialogState
   }
 }
 
-final class _TournamentRowCard extends StatelessWidget {
+final class _TournamentRowCard extends ConsumerWidget {
   const _TournamentRowCard({required this.tournament});
 
   final Tournament tournament;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final accent = switch (tournament.status) {
       TournamentStatus.draft => AppPalette.sky,
@@ -345,6 +347,9 @@ final class _TournamentRowCard extends StatelessWidget {
       TournamentStatus.live => AppPalette.sageStrong,
       TournamentStatus.completed => AppPalette.oliveStrong,
     };
+    final winners = tournament.status == TournamentStatus.completed
+        ? ref.watch(completedWinnerSummariesProvider(tournament.id))
+        : null;
 
     return Material(
       color: Colors.transparent,
@@ -370,63 +375,82 @@ final class _TournamentRowCard extends StatelessWidget {
               ),
               Padding(
                 padding: const EdgeInsets.all(AppSpace.lg),
-                child: Row(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Expanded(
-                      flex: 4,
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            tournament.name,
-                            style: theme.textTheme.titleLarge,
+                    Row(
+                      children: [
+                        Expanded(
+                          flex: 4,
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                tournament.name,
+                                style: theme.textTheme.titleLarge,
+                              ),
+                              const SizedBox(height: AppSpace.xs),
+                              Text(
+                                '${tournament.venue} · ${_formatDate(tournament.startDate)}',
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: AppPalette.inkSoft,
+                                ),
+                              ),
+                            ],
                           ),
-                          const SizedBox(height: AppSpace.xs),
-                          Text(
-                            '${tournament.venue} · ${_formatDate(tournament.startDate)}',
-                            style: theme.textTheme.bodyMedium?.copyWith(
-                              color: AppPalette.inkSoft,
-                            ),
+                        ),
+                        Expanded(
+                          flex: 3,
+                          child: Wrap(
+                            spacing: AppSpace.sm,
+                            runSpacing: AppSpace.sm,
+                            alignment: WrapAlignment.end,
+                            children: [
+                              _WorkspaceChip(
+                                label: tournament.status.label,
+                                tint: accent.withValues(alpha: 0.18),
+                                border: accent.withValues(alpha: 0.45),
+                                foreground: AppPalette.ink,
+                              ),
+                              _WorkspaceChip(
+                                label:
+                                    '${tournament.stats.categories} categories',
+                                tint: AppPalette.skySoft,
+                                border: AppPalette.sky.withValues(alpha: 0.45),
+                                foreground: const Color(0xFF456F77),
+                              ),
+                              _WorkspaceChip(
+                                label: '${tournament.stats.entries} entries',
+                                tint: AppPalette.oliveSoft,
+                                border: AppPalette.oliveStrong.withValues(
+                                  alpha: 0.45,
+                                ),
+                                foreground: const Color(0xFF5F7243),
+                              ),
+                              _WorkspaceChip(
+                                label: '${tournament.stats.matches} matches',
+                                tint: AppPalette.apricotSoft,
+                                border: AppPalette.apricot.withValues(
+                                  alpha: 0.45,
+                                ),
+                                foreground: const Color(0xFF8F6038),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
+                        ),
+                      ],
                     ),
-                    Expanded(
-                      flex: 3,
-                      child: Wrap(
-                        spacing: AppSpace.sm,
-                        runSpacing: AppSpace.sm,
-                        alignment: WrapAlignment.end,
-                        children: [
-                          _WorkspaceChip(
-                            label: tournament.status.label,
-                            tint: accent.withValues(alpha: 0.18),
-                            border: accent.withValues(alpha: 0.45),
-                            foreground: AppPalette.ink,
-                          ),
-                          _WorkspaceChip(
-                            label: '${tournament.stats.categories} categories',
-                            tint: AppPalette.skySoft,
-                            border: AppPalette.sky.withValues(alpha: 0.45),
-                            foreground: const Color(0xFF456F77),
-                          ),
-                          _WorkspaceChip(
-                            label: '${tournament.stats.entries} entries',
-                            tint: AppPalette.oliveSoft,
-                            border: AppPalette.oliveStrong.withValues(
-                              alpha: 0.45,
-                            ),
-                            foreground: const Color(0xFF5F7243),
-                          ),
-                          _WorkspaceChip(
-                            label: '${tournament.stats.matches} matches',
-                            tint: AppPalette.apricotSoft,
-                            border: AppPalette.apricot.withValues(alpha: 0.45),
-                            foreground: const Color(0xFF8F6038),
-                          ),
-                        ],
+                    if (winners != null) ...[
+                      const Divider(
+                        height: AppSpace.xl,
+                        color: AppPalette.line,
                       ),
-                    ),
+                      _CompletedTournamentResults(
+                        winners: winners,
+                        emptyMessage:
+                            'Final winners will appear here after championship matches are completed.',
+                      ),
+                    ],
                   ],
                 ),
               ),
@@ -511,6 +535,109 @@ final class _NoAdditionalTournamentsState extends StatelessWidget {
       style: Theme.of(
         context,
       ).textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
+    );
+  }
+}
+
+final class _CompletedTournamentResults extends StatelessWidget {
+  const _CompletedTournamentResults({
+    required this.winners,
+    required this.emptyMessage,
+  });
+
+  final AsyncValue<List<TournamentWinnerSummary>> winners;
+  final String emptyMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return winners.when(
+      data: (items) {
+        if (items.isEmpty) {
+          return Text(
+            emptyMessage,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppPalette.inkSoft,
+            ),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Category winners',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: AppSpace.sm),
+            Wrap(
+              spacing: AppSpace.sm,
+              runSpacing: AppSpace.sm,
+              children: [
+                for (final winner in items) _WinnerResultTag(summary: winner),
+              ],
+            ),
+          ],
+        );
+      },
+      loading: () => Text(
+        'Loading category winners...',
+        style: theme.textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
+      ),
+      error: (_, _) => Text(
+        'Category winners are not available right now.',
+        style: theme.textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
+      ),
+    );
+  }
+}
+
+final class _WinnerResultTag extends StatelessWidget {
+  const _WinnerResultTag({required this.summary});
+
+  final TournamentWinnerSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 180, maxWidth: 260),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.md,
+        vertical: AppSpace.sm,
+      ),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppPalette.oliveSoft, AppPalette.surface],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppPalette.oliveStrong.withValues(alpha: 0.24),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            summary.categoryName,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppPalette.inkSoft,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            summary.championLabel,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppPalette.ink,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

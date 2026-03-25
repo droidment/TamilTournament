@@ -8,7 +8,9 @@ final tournamentMatchFirestoreProvider = Provider<FirebaseFirestore>((ref) {
   return FirebaseFirestore.instance;
 });
 
-final tournamentMatchRepositoryProvider = Provider<TournamentMatchRepository>((ref) {
+final tournamentMatchRepositoryProvider = Provider<TournamentMatchRepository>((
+  ref,
+) {
   return TournamentMatchRepository(ref.watch(tournamentMatchFirestoreProvider));
 });
 
@@ -17,4 +19,14 @@ final tournamentMatchesProvider =
       return ref
           .watch(tournamentMatchRepositoryProvider)
           .watchMatches(tournamentId);
+    });
+
+final completedWinnerSummariesProvider =
+    FutureProvider.family<List<TournamentWinnerSummary>, String>((
+      ref,
+      tournamentId,
+    ) {
+      return ref
+          .watch(tournamentMatchRepositoryProvider)
+          .loadCompletedWinnerSummaries(tournamentId);
     });

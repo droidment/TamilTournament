@@ -14,10 +14,12 @@ final class CategoriesSection extends ConsumerStatefulWidget {
     super.key,
     required this.tournamentId,
     this.embedded = false,
+    this.readOnly = false,
   });
 
   final String tournamentId;
   final bool embedded;
+  final bool readOnly;
 
   @override
   ConsumerState<CategoriesSection> createState() => _CategoriesSectionState();
@@ -187,7 +189,9 @@ final class _CategoriesSectionState extends ConsumerState<CategoriesSection> {
           description:
               'Tournament-scoped setup for divisions and minimum player rules. Match format is derived from the seeded roster.',
           trailing: FilledButton(
-            onPressed: _isCreating ? null : _showCreateCategoryDialog,
+            onPressed: widget.readOnly || _isCreating
+                ? null
+                : _showCreateCategoryDialog,
             child: Text(_isCreating ? 'Creating...' : 'New category'),
           ),
         ),

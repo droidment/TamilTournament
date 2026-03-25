@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import '../../../firebase/firebase_status.dart';
 import '../../../theme/app_theme.dart';
 import '../../auth/data/auth_providers.dart';
+import '../../scheduler/data/tournament_match_providers.dart';
+import '../../scheduler/domain/tournament_match.dart';
 import '../../tournaments/data/tournament_providers.dart';
 import '../../tournaments/domain/tournament.dart';
 import '../../tournaments/presentation/tournament_workspace_panel.dart';
@@ -112,7 +114,10 @@ final class _Header extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final nextTournament = tournaments.isEmpty ? null : tournaments.first;
+    final nextTournament = tournaments.cast<Tournament?>().firstWhere(
+      (tournament) => tournament?.status != TournamentStatus.completed,
+      orElse: () => tournaments.isEmpty ? null : tournaments.first,
+    );
 
     return Container(
       padding: EdgeInsets.all(isCompact ? AppSpace.md : AppSpace.lg),
@@ -127,6 +132,8 @@ final class _Header extends StatelessWidget {
           Text(
             nextTournament == null
                 ? 'Organizer workspace'
+                : nextTournament.status == TournamentStatus.completed
+                ? 'Latest result'
                 : 'Current tournament',
             style: isCompact
                 ? theme.textTheme.headlineLarge
@@ -151,13 +158,13 @@ final class _Header extends StatelessWidget {
   }
 }
 
-final class _CurrentTournamentCard extends StatelessWidget {
+final class _CurrentTournamentCard extends ConsumerWidget {
   const _CurrentTournamentCard({required this.tournament});
 
   final Tournament tournament;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final theme = Theme.of(context);
     final accent = switch (tournament.status) {
       TournamentStatus.draft => AppPalette.sky,
@@ -165,6 +172,9 @@ final class _CurrentTournamentCard extends StatelessWidget {
       TournamentStatus.live => AppPalette.sageStrong,
       TournamentStatus.completed => AppPalette.oliveStrong,
     };
+    final winners = tournament.status == TournamentStatus.completed
+        ? ref.watch(completedWinnerSummariesProvider(tournament.id))
+        : null;
 
     return Material(
       color: Colors.transparent,
@@ -233,6 +243,14 @@ final class _CurrentTournamentCard extends StatelessWidget {
                   ),
                 ],
               ),
+              if (winners != null) ...[
+                const SizedBox(height: AppSpace.md),
+                _CompletedResultsSummary(
+                  winners: winners,
+                  emptyMessage:
+                      'Final winners will show here once each category title match is completed.',
+                ),
+              ],
             ],
           ),
         ),
@@ -666,10 +684,17 @@ final class _Sidebar extends StatelessWidget {
               ),
               _HeaderChip(
                 label:
-                    '${items.fold<int>(0, (sum, tournament) => sum + tournament.stats.entries)} entries',
+                    '${_statusCount(items, TournamentStatus.completed)} completed',
                 tint: AppPalette.oliveSoft,
                 border: AppPalette.oliveStrong.withValues(alpha: 0.35),
                 foreground: const Color(0xFF5F7243),
+              ),
+              _HeaderChip(
+                label:
+                    '${items.fold<int>(0, (sum, tournament) => sum + tournament.stats.entries)} entries',
+                tint: AppPalette.surfaceSoft,
+                border: AppPalette.lineStrong,
+                foreground: AppPalette.inkSoft,
               ),
             ],
           ),
@@ -707,6 +732,109 @@ final class _HeaderChip extends StatelessWidget {
         style: Theme.of(
           context,
         ).textTheme.bodySmall?.copyWith(color: foreground),
+      ),
+    );
+  }
+}
+
+final class _CompletedResultsSummary extends StatelessWidget {
+  const _CompletedResultsSummary({
+    required this.winners,
+    required this.emptyMessage,
+  });
+
+  final AsyncValue<List<TournamentWinnerSummary>> winners;
+  final String emptyMessage;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return winners.when(
+      data: (items) {
+        if (items.isEmpty) {
+          return Text(
+            emptyMessage,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppPalette.inkSoft,
+            ),
+          );
+        }
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'Category winners',
+              style: theme.textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: AppSpace.sm),
+            Wrap(
+              spacing: AppSpace.sm,
+              runSpacing: AppSpace.sm,
+              children: [
+                for (final winner in items) _WinnerSummaryChip(summary: winner),
+              ],
+            ),
+          ],
+        );
+      },
+      loading: () => Text(
+        'Loading category winners...',
+        style: theme.textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
+      ),
+      error: (_, _) => Text(
+        'Category winners are not available right now.',
+        style: theme.textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
+      ),
+    );
+  }
+}
+
+final class _WinnerSummaryChip extends StatelessWidget {
+  const _WinnerSummaryChip({required this.summary});
+
+  final TournamentWinnerSummary summary;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      constraints: const BoxConstraints(minWidth: 180, maxWidth: 280),
+      padding: const EdgeInsets.symmetric(
+        horizontal: AppSpace.md,
+        vertical: AppSpace.sm,
+      ),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [AppPalette.oliveSoft, AppPalette.surface],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: AppPalette.oliveStrong.withValues(alpha: 0.26),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            summary.categoryName,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: AppPalette.inkSoft,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            summary.championLabel,
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+              color: AppPalette.ink,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
