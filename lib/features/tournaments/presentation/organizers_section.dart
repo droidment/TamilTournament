@@ -336,6 +336,48 @@ class _OrganizersSectionState extends ConsumerState<OrganizersSection> {
     }
   }
 
+  Future<void> _showAccessListDialog({
+    required String title,
+    required Color accent,
+    required Widget child,
+  }) {
+    return showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppPalette.surface,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(AppRadii.panel),
+          side: const BorderSide(color: AppPalette.line),
+        ),
+        title: Row(
+          children: [
+            Container(
+              width: 28,
+              height: 28,
+              decoration: BoxDecoration(
+                color: accent.withValues(alpha: 0.14),
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            const SizedBox(width: AppSpace.sm),
+            Expanded(child: Text(title)),
+          ],
+        ),
+        content: SizedBox(
+          width: 560,
+          child: SingleChildScrollView(child: child),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   Set<String> get _displayOrganizerEmails {
     final emails = widget.tournament.organizerEmails
         .map((email) => email.trim().toLowerCase())
@@ -485,96 +527,49 @@ class _OrganizersSectionState extends ConsumerState<OrganizersSection> {
         ),
         const SizedBox(height: AppSpace.lg),
         WorkspaceSectionLead(
-          title: 'Organizer access',
+          title: 'Access management',
           description:
-              'Share this tournament with another organizer using the Google email they sign in with.',
-          icon: Icons.admin_panel_settings_outlined,
-          accent: AppPalette.sky,
-          trailing: FilledButton.icon(
-            onPressed: widget.readOnly || _isAddingOrganizer
-                ? null
-                : _showAddOrganizerDialog,
-            icon: _isAddingOrganizer
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.person_add_alt_1_rounded),
-            label: Text(_isAddingOrganizer ? 'Adding...' : 'Add organizer'),
-          ),
+              'Manage organizer, assistant, and referee access from compact action buttons instead of long inline lists.',
+          icon: Icons.manage_accounts_outlined,
+          accent: AppPalette.sage,
         ),
         const SizedBox(height: AppSpace.md),
         WorkspaceSurfaceCard(
           padding: const EdgeInsets.all(AppSpace.md),
           radius: 16,
-          accent: AppPalette.sky,
-          child: Column(
+          accent: AppPalette.sage,
+          child: Wrap(
+            spacing: AppSpace.md,
+            runSpacing: AppSpace.md,
             children: [
-              for (var index = 0; index < organizerEmails.length; index++) ...[
-                _OrganizerRow(
-                  email: organizerEmails[index],
-                  isCurrentUser: organizerEmails[index] == currentUserEmail,
-                ),
-                if (index < organizerEmails.length - 1)
-                  const Divider(height: AppSpace.lg, color: AppPalette.line),
-              ],
-            ],
-          ),
-        ),
-        const SizedBox(height: AppSpace.lg),
-        WorkspaceSectionLead(
-          title: 'Assistant access',
-          description:
-              'Assign assistant desk access by the Google email they use to sign in.',
-          icon: Icons.assignment_ind,
-          accent: AppPalette.sage,
-          trailing: FilledButton.icon(
-            onPressed: widget.readOnly || _isAddingAssistant
-                ? null
-                : () => _showAddAssistantDialog(assistantRoles),
-            icon: _isAddingAssistant
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.person_add_alt_1_rounded),
-            label: Text(_isAddingAssistant ? 'Adding...' : 'Add assistant'),
-          ),
-        ),
-        const SizedBox(height: AppSpace.md),
-        WorkspaceSurfaceCard(
-          padding: const EdgeInsets.all(AppSpace.md),
-          radius: 16,
-          accent: AppPalette.sage,
-          child: rolesAsync.when(
-            data: (_) => assistantRoles.isEmpty
-                ? const _AccessEmptyState(
-                    title: 'No assistants assigned yet',
-                    message:
-                        'Add an assistant email to let someone open the assistant desk.',
-                  )
-                : Column(
+              _AccessActionTile(
+                title: 'Organizers',
+                subtitle: '${organizerEmails.length} active',
+                accent: AppPalette.sky,
+                primaryLabel: _isAddingOrganizer ? 'Adding...' : 'Add',
+                primaryIcon: _isAddingOrganizer
+                    ? null
+                    : Icons.person_add_alt_1_rounded,
+                onPrimaryPressed: widget.readOnly || _isAddingOrganizer
+                    ? null
+                    : _showAddOrganizerDialog,
+                secondaryLabel: 'View',
+                onSecondaryPressed: () => _showAccessListDialog(
+                  title: 'Organizer access',
+                  accent: AppPalette.sky,
+                  child: Column(
                     children: [
                       for (
                         var index = 0;
-                        index < assistantRoles.length;
+                        index < organizerEmails.length;
                         index++
                       ) ...[
-                        _RoleAccessRow(
-                          email: assistantRoles[index].email,
+                        _OrganizerRow(
+                          email: organizerEmails[index],
                           isCurrentUser:
-                              assistantRoles[index].email == currentUserEmail,
-                          badges: const [
-                            _OrganizerBadge(
-                              label: 'Assistant',
-                              foreground: Color(0xFF365141),
-                              background: Color(0xFFE7F4EE),
-                            ),
-                          ],
+                              organizerEmails[index] == currentUserEmail,
                         ),
-                        if (index < assistantRoles.length - 1)
+                        if (index < organizerEmails.length - 1)
                           const Divider(
                             height: AppSpace.lg,
                             color: AppPalette.line,
@@ -582,71 +577,111 @@ class _OrganizersSectionState extends ConsumerState<OrganizersSection> {
                       ],
                     ],
                   ),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => _AccessEmptyState(
-              title: 'Could not load assistant access',
-              message: _friendlyOrganizerError(error),
-            ),
-          ),
-        ),
-        const SizedBox(height: AppSpace.lg),
-        WorkspaceSectionLead(
-          title: 'Referee access',
-          description:
-              'Manage staff-assigned referees and people who volunteered from the public tournament page.',
-          icon: Icons.sports_tennis,
-          accent: AppPalette.apricot,
-          trailing: FilledButton.icon(
-            onPressed: widget.readOnly || _isAddingReferee
-                ? null
-                : () => _showAddRefereeDialog(refereeRoles),
-            icon: _isAddingReferee
-                ? const SizedBox(
-                    width: 16,
-                    height: 16,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.person_add_alt_1_rounded),
-            label: Text(_isAddingReferee ? 'Adding...' : 'Add referee'),
-          ),
-        ),
-        const SizedBox(height: AppSpace.md),
-        WorkspaceSurfaceCard(
-          padding: const EdgeInsets.all(AppSpace.md),
-          radius: 16,
-          accent: AppPalette.apricot,
-          child: rolesAsync.when(
-            data: (_) => refereeRoles.isEmpty
-                ? const _AccessEmptyState(
-                    title: 'No referees added yet',
-                    message:
-                        'Assign a referee by email or let signed-in visitors volunteer once the public page is live.',
-                  )
-                : Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _RoleGroupBlock(
-                        title: 'Organizer-assigned',
-                        roles: organizerAssignedReferees,
-                        currentUserEmail: currentUserEmail,
-                        busyRoleId: _busyRoleId,
-                        onDeactivate: widget.readOnly ? null : _deactivateRole,
-                      ),
-                      const SizedBox(height: AppSpace.lg),
-                      _RoleGroupBlock(
-                        title: 'Volunteered',
-                        roles: volunteeredReferees,
-                        currentUserEmail: currentUserEmail,
-                        busyRoleId: _busyRoleId,
-                        onDeactivate: widget.readOnly ? null : _deactivateRole,
-                      ),
-                    ],
-                  ),
-            loading: () => const Center(child: CircularProgressIndicator()),
-            error: (error, _) => _AccessEmptyState(
-              title: 'Could not load referee access',
-              message: _friendlyOrganizerError(error),
-            ),
+                ),
+              ),
+              _AccessActionTile(
+                title: 'Assistants',
+                subtitle: assistantRoles.isEmpty
+                    ? 'No assistants'
+                    : '${assistantRoles.length} active',
+                accent: AppPalette.sage,
+                primaryLabel: _isAddingAssistant ? 'Adding...' : 'Add',
+                primaryIcon: _isAddingAssistant
+                    ? null
+                    : Icons.person_add_alt_1_rounded,
+                onPrimaryPressed: widget.readOnly || _isAddingAssistant
+                    ? null
+                    : () => _showAddAssistantDialog(assistantRoles),
+                secondaryLabel: 'View',
+                onSecondaryPressed: () => _showAccessListDialog(
+                  title: 'Assistant access',
+                  accent: AppPalette.sage,
+                  child: assistantRoles.isEmpty
+                      ? const _AccessEmptyState(
+                          title: 'No assistants assigned yet',
+                          message:
+                              'Add an assistant email to let someone open the assistant desk.',
+                        )
+                      : Column(
+                          children: [
+                            for (
+                              var index = 0;
+                              index < assistantRoles.length;
+                              index++
+                            ) ...[
+                              _RoleAccessRow(
+                                email: assistantRoles[index].email,
+                                isCurrentUser:
+                                    assistantRoles[index].email ==
+                                    currentUserEmail,
+                                badges: const [
+                                  _OrganizerBadge(
+                                    label: 'Assistant',
+                                    foreground: Color(0xFF365141),
+                                    background: Color(0xFFE7F4EE),
+                                  ),
+                                ],
+                              ),
+                              if (index < assistantRoles.length - 1)
+                                const Divider(
+                                  height: AppSpace.lg,
+                                  color: AppPalette.line,
+                                ),
+                            ],
+                          ],
+                        ),
+                ),
+              ),
+              _AccessActionTile(
+                title: 'Referees',
+                subtitle: refereeRoles.isEmpty
+                    ? 'No referees'
+                    : '${refereeRoles.where((role) => role.isActive).length} active',
+                accent: AppPalette.apricot,
+                primaryLabel: _isAddingReferee ? 'Adding...' : 'Add',
+                primaryIcon: _isAddingReferee
+                    ? null
+                    : Icons.person_add_alt_1_rounded,
+                onPrimaryPressed: widget.readOnly || _isAddingReferee
+                    ? null
+                    : () => _showAddRefereeDialog(refereeRoles),
+                secondaryLabel: 'Manage',
+                onSecondaryPressed: () => _showAccessListDialog(
+                  title: 'Referee access',
+                  accent: AppPalette.apricot,
+                  child: refereeRoles.isEmpty
+                      ? const _AccessEmptyState(
+                          title: 'No referees added yet',
+                          message:
+                              'Assign a referee by email or let signed-in visitors volunteer once the public page is live.',
+                        )
+                      : Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _RoleGroupBlock(
+                              title: 'Organizer-assigned',
+                              roles: organizerAssignedReferees,
+                              currentUserEmail: currentUserEmail,
+                              busyRoleId: _busyRoleId,
+                              onDeactivate: widget.readOnly
+                                  ? null
+                                  : _deactivateRole,
+                            ),
+                            const SizedBox(height: AppSpace.lg),
+                            _RoleGroupBlock(
+                              title: 'Volunteered',
+                              roles: volunteeredReferees,
+                              currentUserEmail: currentUserEmail,
+                              busyRoleId: _busyRoleId,
+                              onDeactivate: widget.readOnly
+                                  ? null
+                                  : _deactivateRole,
+                            ),
+                          ],
+                        ),
+                ),
+              ),
+            ],
           ),
         ),
       ],
@@ -724,6 +759,75 @@ final class _OrganizerRow extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+final class _AccessActionTile extends StatelessWidget {
+  const _AccessActionTile({
+    required this.title,
+    required this.subtitle,
+    required this.accent,
+    required this.primaryLabel,
+    required this.onPrimaryPressed,
+    required this.secondaryLabel,
+    required this.onSecondaryPressed,
+    this.primaryIcon,
+  });
+
+  final String title;
+  final String subtitle;
+  final Color accent;
+  final String primaryLabel;
+  final VoidCallback? onPrimaryPressed;
+  final String secondaryLabel;
+  final VoidCallback onSecondaryPressed;
+  final IconData? primaryIcon;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 220,
+      padding: const EdgeInsets.all(AppSpace.md),
+      decoration: BoxDecoration(
+        color: AppPalette.surfaceSoft,
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        border: Border.all(color: AppPalette.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(title, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: AppSpace.xs),
+          Text(
+            subtitle,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
+          ),
+          const SizedBox(height: AppSpace.md),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton.icon(
+                  onPressed: onPrimaryPressed,
+                  icon: primaryIcon == null
+                      ? const SizedBox.shrink()
+                      : Icon(primaryIcon, size: 16),
+                  label: Text(primaryLabel),
+                ),
+              ),
+              const SizedBox(width: AppSpace.sm),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: onSecondaryPressed,
+                  child: Text(secondaryLabel),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
     );
   }
 }
