@@ -1219,47 +1219,58 @@ final class _CategoryList extends StatelessWidget {
       );
     }
 
-    return Wrap(
-      spacing: AppSpace.md,
-      runSpacing: AppSpace.md,
-      children: [
-        for (final category in categories)
-          SizedBox(
-            width: 240,
-            child: WorkspaceSurfaceCard(
-              accent: category.format == CategoryFormat.knockout
-                  ? AppPalette.apricot
-                  : AppPalette.sageStrong,
-              padding: const EdgeInsets.all(AppSpace.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    category.name,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpace.sm),
-                  Wrap(
-                    spacing: AppSpace.xs,
-                    runSpacing: AppSpace.xs,
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        final cardWidth = switch (availableWidth) {
+          < 720 => availableWidth,
+          < 1120 => (availableWidth - AppSpace.md) / 2,
+          _ => (availableWidth - (AppSpace.md * 2)) / 3,
+        };
+
+        return Wrap(
+          spacing: AppSpace.md,
+          runSpacing: AppSpace.md,
+          children: [
+            for (final category in categories)
+              SizedBox(
+                width: cardWidth,
+                child: WorkspaceSurfaceCard(
+                  accent: category.format == CategoryFormat.knockout
+                      ? AppPalette.apricot
+                      : AppPalette.sageStrong,
+                  padding: const EdgeInsets.all(AppSpace.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      WorkspaceTag(
-                        label: category.format.label,
-                        background: AppPalette.surfaceSoft,
-                        foreground: AppPalette.inkSoft,
+                      Text(
+                        category.name,
+                        style: Theme.of(context).textTheme.titleMedium,
                       ),
-                      WorkspaceTag(
-                        label: '${category.checkedInPairs} checked in',
-                        background: AppPalette.skySoft,
-                        foreground: const Color(0xFF456F77),
+                      const SizedBox(height: AppSpace.sm),
+                      Wrap(
+                        spacing: AppSpace.xs,
+                        runSpacing: AppSpace.xs,
+                        children: [
+                          WorkspaceTag(
+                            label: category.format.label,
+                            background: AppPalette.surfaceSoft,
+                            foreground: AppPalette.inkSoft,
+                          ),
+                          WorkspaceTag(
+                            label: '${category.checkedInPairs} checked in',
+                            background: AppPalette.skySoft,
+                            foreground: const Color(0xFF456F77),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
-      ],
+          ],
+        );
+      },
     );
   }
 }
