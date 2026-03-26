@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../theme/app_theme.dart';
 
@@ -77,146 +78,29 @@ class _SignInPageState extends State<SignInPage> {
                     constraints: BoxConstraints(
                       maxWidth: isCompact ? 520 : 1020,
                     ),
-                    child: Flex(
-                      direction: isCompact ? Axis.vertical : Axis.horizontal,
+                    child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Flexible(
-                          child: Padding(
-                            padding: EdgeInsets.only(
-                              right: isCompact ? 0 : AppSpace.xl,
-                              bottom: isCompact ? AppSpace.lg : 0,
-                            ),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Run the tournament from one screen, not five spreadsheets.',
-                                  style:
-                                      (isCompact
-                                              ? theme.textTheme.headlineLarge
-                                              : theme.textTheme.displayLarge)
-                                          ?.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                          ),
-                                ),
-                                const SizedBox(height: AppSpace.md),
-                                ConstrainedBox(
-                                  constraints: const BoxConstraints(
-                                    maxWidth: 560,
-                                  ),
-                                  child: Text(
-                                    'Set up categories, check in pairs, manage courts, and keep the tournament moving from one workspace.',
-                                    style: theme.textTheme.bodyLarge?.copyWith(
-                                      color: AppPalette.inkSoft,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: AppSpace.lg),
-                                Wrap(
-                                  spacing: AppSpace.sm,
-                                  runSpacing: AppSpace.sm,
-                                  children: const [
-                                    _InfoChip(
-                                      label: 'Check-in',
-                                      tint: AppPalette.sageSoft,
-                                      textColor: AppPalette.ink,
-                                    ),
-                                    _InfoChip(
-                                      label: 'Categories',
-                                      tint: AppPalette.skySoft,
-                                      textColor: Color(0xFF456F77),
-                                    ),
-                                    _InfoChip(
-                                      label: 'Courts',
-                                      tint: AppPalette.apricotSoft,
-                                      textColor: Color(0xFF8F6038),
-                                    ),
-                                    _InfoChip(
-                                      label: 'Scores',
-                                      tint: AppPalette.oliveSoft,
-                                      textColor: Color(0xFF5F7243),
-                                    ),
-                                  ],
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        Flexible(
-                          child: Container(
-                            width: double.infinity,
-                            padding: const EdgeInsets.all(AppSpace.lg),
-                            decoration: BoxDecoration(
-                              color: AppPalette.surface,
-                              borderRadius: BorderRadius.circular(
-                                AppRadii.panel,
+                        if (!isCompact)
+                          Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Expanded(
+                                child: _buildHeroContent(theme, isCompact),
                               ),
-                              border: Border.all(color: AppPalette.line),
-                            ),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  'Open the organizer workspace',
-                                  style: theme.textTheme.headlineMedium,
-                                ),
-                                const SizedBox(height: AppSpace.xs),
-                                Text(
-                                  'Sign in with the organizer account for this event and continue where setup left off.',
-                                  style: theme.textTheme.bodyMedium?.copyWith(
-                                    color: AppPalette.inkSoft,
-                                  ),
-                                ),
-                                const SizedBox(height: AppSpace.lg),
-                                SizedBox(
-                                  width: double.infinity,
-                                  child: FilledButton(
-                                    onPressed: _isLoading
-                                        ? null
-                                        : _signInWithGoogle,
-                                    child: Text(
-                                      _isLoading
-                                          ? 'Opening sign-in...'
-                                          : 'Enter workspace',
-                                    ),
-                                  ),
-                                ),
-                                if (_errorMessage != null) ...[
-                                  const SizedBox(height: AppSpace.md),
-                                  Container(
-                                    width: double.infinity,
-                                    padding: const EdgeInsets.all(AppSpace.md),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0x24C97D6B),
-                                      borderRadius: BorderRadius.circular(
-                                        AppRadii.panel,
-                                      ),
-                                      border: Border.all(
-                                        color: const Color(0x47C97D6B),
-                                      ),
-                                    ),
-                                    child: Text(
-                                      _errorMessage!,
-                                      style: theme.textTheme.bodyMedium
-                                          ?.copyWith(
-                                            color: const Color(0xFF7B4D42),
-                                          ),
-                                    ),
-                                  ),
-                                ],
-                                const SizedBox(height: AppSpace.lg),
-                                Text(
-                                  'Use the published organizer site when staff are signing in during live operation.',
-                                  style: theme.textTheme.bodySmall?.copyWith(
-                                    color: AppPalette.inkMuted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
+                              const SizedBox(width: AppSpace.xl),
+                              Expanded(
+                                child: _buildSignInCard(theme),
+                              ),
+                            ],
+                          )
+                        else ...[
+                          _buildHeroContent(theme, isCompact),
+                          const SizedBox(height: AppSpace.lg),
+                          _buildSignInCard(theme),
+                        ],
+                        const SizedBox(height: AppSpace.lg),
+                        const _StaffAccessSection(),
                       ],
                     ),
                   ),
@@ -225,6 +109,122 @@ class _SignInPageState extends State<SignInPage> {
             },
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildHeroContent(ThemeData theme, bool isCompact) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Run the tournament from one screen, not five spreadsheets.',
+          style: (isCompact
+                  ? theme.textTheme.headlineLarge
+                  : theme.textTheme.displayLarge)
+              ?.copyWith(fontWeight: FontWeight.w700),
+        ),
+        const SizedBox(height: AppSpace.md),
+        ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 560),
+          child: Text(
+            'Set up categories, check in pairs, manage courts, and keep the tournament moving from one workspace.',
+            style: theme.textTheme.bodyLarge?.copyWith(
+              color: AppPalette.inkSoft,
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpace.lg),
+        Wrap(
+          spacing: AppSpace.sm,
+          runSpacing: AppSpace.sm,
+          children: const [
+            _InfoChip(
+              label: 'Check-in',
+              tint: AppPalette.sageSoft,
+              textColor: AppPalette.ink,
+            ),
+            _InfoChip(
+              label: 'Categories',
+              tint: AppPalette.skySoft,
+              textColor: Color(0xFF456F77),
+            ),
+            _InfoChip(
+              label: 'Courts',
+              tint: AppPalette.apricotSoft,
+              textColor: Color(0xFF8F6038),
+            ),
+            _InfoChip(
+              label: 'Scores',
+              tint: AppPalette.oliveSoft,
+              textColor: Color(0xFF5F7243),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildSignInCard(ThemeData theme) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpace.lg),
+      decoration: BoxDecoration(
+        color: AppPalette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        border: Border.all(color: AppPalette.line),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Open the organizer workspace',
+            style: theme.textTheme.headlineMedium,
+          ),
+          const SizedBox(height: AppSpace.xs),
+          Text(
+            'Sign in with the organizer account for this event and continue where setup left off.',
+            style: theme.textTheme.bodyMedium?.copyWith(
+              color: AppPalette.inkSoft,
+            ),
+          ),
+          const SizedBox(height: AppSpace.lg),
+          SizedBox(
+            width: double.infinity,
+            child: FilledButton(
+              onPressed: _isLoading ? null : _signInWithGoogle,
+              child: Text(
+                _isLoading ? 'Opening sign-in...' : 'Enter workspace',
+              ),
+            ),
+          ),
+          if (_errorMessage != null) ...[
+            const SizedBox(height: AppSpace.md),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppSpace.md),
+              decoration: BoxDecoration(
+                color: const Color(0x24C97D6B),
+                borderRadius: BorderRadius.circular(AppRadii.panel),
+                border: Border.all(color: const Color(0x47C97D6B)),
+              ),
+              child: Text(
+                _errorMessage!,
+                style: theme.textTheme.bodyMedium?.copyWith(
+                  color: const Color(0xFF7B4D42),
+                ),
+              ),
+            ),
+          ],
+          const SizedBox(height: AppSpace.lg),
+          Text(
+            'Use the published organizer site when staff are signing in during live operation.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppPalette.inkMuted,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -242,6 +242,152 @@ String _friendlyAuthError(FirebaseAuthException error) {
     return 'Sign-in was closed before it finished. Try again when you are ready.';
   }
   return 'We could not open the organizer workspace right now. Please try again.';
+}
+
+final class _StaffAccessSection extends StatefulWidget {
+  const _StaffAccessSection();
+
+  @override
+  State<_StaffAccessSection> createState() => _StaffAccessSectionState();
+}
+
+class _StaffAccessSectionState extends State<_StaffAccessSection> {
+  final _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  void _goToRole(String prefix) {
+    final code = _controller.text.trim();
+    if (code.isEmpty) return;
+    context.go('/$prefix/$code');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpace.lg),
+      decoration: BoxDecoration(
+        color: AppPalette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        border: Border.all(color: AppPalette.line),
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            'Staff & spectator access',
+            style: theme.textTheme.titleMedium,
+          ),
+          const SizedBox(height: AppSpace.xs),
+          Text(
+            'Enter a tournament code to open an assistant, referee, or public view.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppPalette.inkSoft,
+            ),
+          ),
+          const SizedBox(height: AppSpace.md),
+          TextField(
+            controller: _controller,
+            decoration: const InputDecoration(
+              hintText: 'Tournament code or slug',
+              isDense: true,
+            ),
+            onSubmitted: (_) => _goToRole('a'),
+          ),
+          const SizedBox(height: AppSpace.md),
+          Wrap(
+            spacing: AppSpace.sm,
+            runSpacing: AppSpace.sm,
+            children: [
+              _RoleLinkChip(
+                label: 'Assistant',
+                icon: Icons.assignment_ind_outlined,
+                tint: Colors.teal.shade50,
+                border: Colors.teal.shade200,
+                foreground: Colors.teal.shade700,
+                onTap: () => _goToRole('a'),
+              ),
+              _RoleLinkChip(
+                label: 'Referee',
+                icon: Icons.sports_outlined,
+                tint: Colors.orange.shade50,
+                border: Colors.orange.shade200,
+                foreground: Colors.orange.shade700,
+                onTap: () => _goToRole('r'),
+              ),
+              _RoleLinkChip(
+                label: 'Public',
+                icon: Icons.public_outlined,
+                tint: Colors.blue.shade50,
+                border: Colors.blue.shade200,
+                foreground: Colors.blue.shade700,
+                onTap: () => _goToRole('p'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+final class _RoleLinkChip extends StatelessWidget {
+  const _RoleLinkChip({
+    required this.label,
+    required this.icon,
+    required this.tint,
+    required this.border,
+    required this.foreground,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color tint;
+  final Color border;
+  final Color foreground;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: tint,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: foreground),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: foreground,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 final class _InfoChip extends StatelessWidget {

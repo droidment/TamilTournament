@@ -185,7 +185,10 @@ final class TournamentMatch {
 
   bool get isPending => status == TournamentMatchStatus.pending;
   bool get isReady => status == TournamentMatchStatus.ready;
+  bool get isAssigned => status == TournamentMatchStatus.assigned;
+  bool get isCalled => status == TournamentMatchStatus.called;
   bool get isOnCourt => status == TournamentMatchStatus.onCourt;
+  bool get isScoreSubmitted => status == TournamentMatchStatus.scoreSubmitted;
   bool get isCompleted => status == TournamentMatchStatus.completed;
   bool get hasScores => scores.isNotEmpty;
   String get scoreSummary => scores
@@ -232,8 +235,7 @@ final class TournamentMatch {
           .toList(growable: false),
       winnerEntryId: data['winnerEntryId'] as String?,
       winnerLabel: data['winnerLabel'] as String?,
-      officialScoreSubmissionId:
-          data['officialScoreSubmissionId'] as String?,
+      officialScoreSubmissionId: data['officialScoreSubmissionId'] as String?,
       officializedByUserId: data['officializedByUserId'] as String?,
       officializedByRole: data['officializedByRole'] as String?,
       officializedAt: (data['officializedAt'] as Timestamp?)?.toDate(),

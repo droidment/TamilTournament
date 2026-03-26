@@ -215,7 +215,7 @@ Constraints:
 - follow the local Playwright workflow in C:\Users\Raj\.codex\skills\playwright-interactive\SKILL.md
 
 Required runtime:
-- flutter run -d web-server --web-hostname 127.0.0.1 --web-port 7357
+- flutter run -d web-server --web-hostname localhost --web-port 7357
 
 Deliverables:
 - smoke inventory for route reachability and role gating

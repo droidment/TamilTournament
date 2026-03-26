@@ -251,6 +251,125 @@ final class _CurrentTournamentCard extends ConsumerWidget {
                       'Final winners will show here once each category title match is completed.',
                 ),
               ],
+              const SizedBox(height: AppSpace.md),
+              _RoleViewButtons(tournament: tournament),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+final class _RoleViewButtons extends StatelessWidget {
+  const _RoleViewButtons({required this.tournament});
+
+  final Tournament tournament;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Role views',
+          style: theme.textTheme.bodySmall?.copyWith(
+            color: AppPalette.inkMuted,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        const SizedBox(height: AppSpace.sm),
+        Wrap(
+          spacing: AppSpace.sm,
+          runSpacing: AppSpace.sm,
+          children: [
+            _RoleViewChip(
+              label: 'Assistant',
+              icon: Icons.assignment_ind_outlined,
+              tint: Colors.teal.shade50,
+              border: Colors.teal.shade200,
+              foreground: Colors.teal.shade700,
+              onTap: () => context.go('/a/${tournament.id}'),
+            ),
+            _RoleViewChip(
+              label: 'Referee',
+              icon: Icons.sports_outlined,
+              tint: Colors.orange.shade50,
+              border: Colors.orange.shade200,
+              foreground: Colors.orange.shade700,
+              onTap: () => context.go('/r/${tournament.id}'),
+            ),
+            if (tournament.publicSlug != null &&
+                tournament.publicSlug!.isNotEmpty)
+              _RoleViewChip(
+                label: 'Public',
+                icon: Icons.public_outlined,
+                tint: Colors.blue.shade50,
+                border: Colors.blue.shade200,
+                foreground: Colors.blue.shade700,
+                onTap: () => context.go('/p/${tournament.publicSlug}'),
+              )
+            else
+              _RoleViewChip(
+                label: 'Public',
+                icon: Icons.public_outlined,
+                tint: Colors.blue.shade50,
+                border: Colors.blue.shade200,
+                foreground: Colors.blue.shade700,
+                onTap: () => context.go('/p/${tournament.id}'),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
+}
+
+final class _RoleViewChip extends StatelessWidget {
+  const _RoleViewChip({
+    required this.label,
+    required this.icon,
+    required this.tint,
+    required this.border,
+    required this.foreground,
+    required this.onTap,
+  });
+
+  final String label;
+  final IconData icon;
+  final Color tint;
+  final Color border;
+  final Color foreground;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+          decoration: BoxDecoration(
+            color: tint,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: border),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 16, color: foreground),
+              const SizedBox(width: 6),
+              Text(
+                label,
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: foreground,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
             ],
           ),
         ),

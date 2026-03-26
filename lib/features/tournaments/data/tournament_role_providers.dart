@@ -5,26 +5,42 @@ import '../domain/tournament_role.dart';
 import 'tournament_providers.dart';
 import 'tournament_role_repository.dart';
 
-final tournamentRoleRepositoryProvider =
-    Provider<TournamentRoleRepository>((ref) {
+final tournamentRoleRepositoryProvider = Provider<TournamentRoleRepository>((
+  ref,
+) {
   return TournamentRoleRepository(ref.watch(firebaseFirestoreProvider));
 });
 
 final tournamentRolesProvider =
-    StreamProvider.family<List<TournamentRole>, String>((
+    StreamProvider.family<List<TournamentRole>, String>((ref, tournamentId) {
+      return ref
+          .watch(tournamentRoleRepositoryProvider)
+          .watchRoles(tournamentId: tournamentId);
+    });
+
+final currentUserRoleProvider = FutureProvider.family<TournamentRole?, String>((
   ref,
   tournamentId,
-) {
-  return ref
-      .watch(tournamentRoleRepositoryProvider)
-      .watchRoles(tournamentId: tournamentId);
-});
-
-final currentUserRoleProvider =
-    FutureProvider.family<TournamentRole?, String>((ref, tournamentId) async {
+) async {
   final user = ref.watch(firebaseAuthProvider).currentUser;
   if (user == null) {
     return null;
+  }
+  final ownedTournament = await ref.watch(
+    tournamentByIdProvider(tournamentId).future,
+  );
+  if (ownedTournament != null) {
+    return TournamentRole(
+      id: user.uid,
+      tournamentId: tournamentId,
+      userId: user.uid,
+      email: user.email ?? '',
+      displayName: user.displayName ?? 'Organizer',
+      role: TournamentRoleType.organizer,
+      isActive: true,
+      assignedAt: null,
+      assignedBy: user.uid,
+    );
   }
   return ref
       .watch(tournamentRoleRepositoryProvider)

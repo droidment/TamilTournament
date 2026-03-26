@@ -21,7 +21,7 @@ Constraints:
 Required runtime:
 
 ```bash
-flutter run -d web-server --web-hostname 127.0.0.1 --web-port 7357
+flutter run -d web-server --web-hostname localhost --web-port 7357
 ```
 
 Deliverables:

@@ -691,7 +691,7 @@ QA uses Playwright against Flutter web in browser-testable mode, not `flutter ru
 Recommended runtime:
 
 ```bash
-flutter run -d web-server --web-hostname 127.0.0.1 --web-port 7357
+flutter run -d web-server --web-hostname localhost --web-port 7357
 ```
 
 Skill reference:
@@ -701,7 +701,7 @@ Skill reference:
 ### QA runtime rules
 
 - Start the Flutter web server in a persistent terminal session.
-- Prefer `127.0.0.1` over `localhost`.
+- Use `localhost` consistently for the local QA URL.
 - Maintain a shared QA inventory per milestone before signoff.
 - Reuse the same Playwright session where possible.
 - Run separate functional and visual QA passes.
