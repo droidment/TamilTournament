@@ -40,8 +40,11 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
     final submissionsAsync = ref.watch(
       pendingSubmissionsProvider(widget.tournamentId),
     );
+    final rolesAsync = ref.watch(tournamentRolesProvider(widget.tournamentId));
     final roleAsync = ref.watch(currentUserRoleProvider(widget.tournamentId));
-    final tournamentAsync = ref.watch(tournamentByIdProvider(widget.tournamentId));
+    final tournamentAsync = ref.watch(
+      tournamentByIdProvider(widget.tournamentId),
+    );
     final tournamentName =
         tournamentAsync.asData?.value?.name ?? widget.tournamentId;
 
@@ -49,6 +52,7 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
         matchesAsync.error ??
         courtsAsync.error ??
         submissionsAsync.error ??
+        rolesAsync.error ??
         roleAsync.error;
     if (firstError != null) {
       return _AssistantScaffold(
@@ -66,6 +70,7 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
     if (matchesAsync.isLoading ||
         courtsAsync.isLoading ||
         submissionsAsync.isLoading ||
+        rolesAsync.isLoading ||
         roleAsync.isLoading) {
       return const _AssistantScaffold(
         roleLabel: 'Assistant',
@@ -93,6 +98,21 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
     final matches = matchesAsync.value ?? const <TournamentMatch>[];
     final courts = courtsAsync.value ?? const <TournamentCourt>[];
     final submissions = submissionsAsync.value ?? const <ScoreSubmission>[];
+    final volunteerReferees =
+        (rolesAsync.value ?? const <TournamentRole>[])
+            .where(
+              (role) =>
+                  role.role == TournamentRoleType.referee &&
+                  role.assignmentSource ==
+                      TournamentRoleAssignmentSource.volunteer,
+            )
+            .toList(growable: false)
+          ..sort((left, right) {
+            if (left.isActive != right.isActive) {
+              return right.isActive ? 1 : -1;
+            }
+            return left.email.compareTo(right.email);
+          });
 
     final readyMatches = matches.where((match) => match.isReady).toList();
     final assignedMatches = matches
@@ -145,6 +165,7 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
         assignedMatches.length,
         onCourtMatches.length,
         submissions,
+        volunteerReferees,
         user,
         role.role,
         matchById,
@@ -213,6 +234,7 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
     int assignedCount,
     int onCourtCount,
     List<ScoreSubmission> submissions,
+    List<TournamentRole> volunteerReferees,
     User user,
     TournamentRoleType role,
     Map<String, TournamentMatch> matchById,
@@ -230,6 +252,8 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
         ),
         const SizedBox(height: AppSpace.lg),
         _buildSubmissions(context, user, role, submissions, matchById),
+        const SizedBox(height: AppSpace.xl),
+        _buildVolunteerReferees(context, volunteerReferees),
       ],
     );
   }
@@ -273,10 +297,7 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            tournamentName,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
+          Text(tournamentName, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: AppSpace.xs),
           Text(
             'Queue matches, manage court flow, and review score submissions from one desk.',
@@ -580,6 +601,52 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
                   role: role,
                   submission: submission,
                 ),
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildVolunteerReferees(
+    BuildContext context,
+    List<TournamentRole> volunteerReferees,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _SectionTitle(
+          title: 'Volunteer referees',
+          subtitle:
+              'Deactivate public volunteers when desk access should close.',
+        ),
+        const SizedBox(height: AppSpace.sm),
+        if (volunteerReferees.isEmpty)
+          const _EmptyState(
+            title: 'No volunteer referees',
+            message:
+                'Signed-in volunteers will appear here once they opt in from the public page.',
+            icon: Icons.groups_outlined,
+          )
+        else
+          ...volunteerReferees.map(
+            (role) => Padding(
+              padding: const EdgeInsets.only(bottom: AppSpace.sm),
+              child: _VolunteerRefereeCard(
+                role: role,
+                isBusy: _busyActionId == 'deactivate-${role.id}',
+                onDeactivate: role.isActive
+                    ? () => _runAction(
+                        actionId: 'deactivate-${role.id}',
+                        successMessage: 'Volunteer referee access removed.',
+                        action: () => ref
+                            .read(tournamentRoleRepositoryProvider)
+                            .deactivateRole(
+                              tournamentId: widget.tournamentId,
+                              roleId: role.id,
+                            ),
+                      )
+                    : null,
               ),
             ),
           ),
@@ -996,6 +1063,59 @@ final class _PendingSubmissionCard extends StatelessWidget {
               ),
             ],
           ),
+        ],
+      ),
+    );
+  }
+}
+
+final class _VolunteerRefereeCard extends StatelessWidget {
+  const _VolunteerRefereeCard({
+    required this.role,
+    required this.isBusy,
+    required this.onDeactivate,
+  });
+
+  final TournamentRole role;
+  final bool isBusy;
+  final VoidCallback? onDeactivate;
+
+  @override
+  Widget build(BuildContext context) {
+    return _SurfaceCard(
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  role.email,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: AppSpace.xs),
+                Wrap(
+                  spacing: AppSpace.sm,
+                  runSpacing: AppSpace.xs,
+                  children: [
+                    _StatusBadge(
+                      label: role.assignmentSource.label,
+                      color: Colors.orange,
+                    ),
+                    _StatusBadge(
+                      label: role.isActive ? 'Active' : 'Inactive',
+                      color: role.isActive ? Colors.teal : Colors.grey,
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          if (onDeactivate != null)
+            OutlinedButton(
+              onPressed: isBusy ? null : onDeactivate,
+              child: Text(isBusy ? 'Updating...' : 'Deactivate'),
+            ),
         ],
       ),
     );

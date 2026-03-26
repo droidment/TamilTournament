@@ -100,6 +100,50 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.isPublic == true;
     }
 
+    function acceptsVolunteerReferees(tournamentId) {
+      return get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.acceptingVolunteerReferees == true;
+    }
+
+    function isVolunteerRoleCreate(tournamentId, roleId) {
+      return signedIn()
+        && isPublicTournament(tournamentId)
+        && acceptsVolunteerReferees(tournamentId)
+        && roleId == request.auth.uid
+        && organizerEmail() != ''
+        && request.resource.data.keys().hasOnly([
+          'userId',
+          'email',
+          'displayName',
+          'role',
+          'isActive',
+          'assignmentSource',
+          'assignedAt',
+          'assignedBy',
+        ])
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.email == organizerEmail()
+        && request.resource.data.displayName is string
+        && request.resource.data.role == 'referee'
+        && request.resource.data.isActive == true
+        && request.resource.data.assignmentSource == 'volunteer'
+        && request.resource.data.assignedBy == request.auth.uid;
+    }
+
+    function canAssistantDeactivateVolunteerReferee(tournamentId) {
+      return hasTournamentRole(tournamentId, 'assistant')
+        && resource.data.role == 'referee'
+        && resource.data.assignmentSource == 'volunteer'
+        && resource.data.isActive == true
+        && request.resource.data.userId == resource.data.userId
+        && request.resource.data.email == resource.data.email
+        && request.resource.data.displayName == resource.data.displayName
+        && request.resource.data.role == resource.data.role
+        && request.resource.data.assignmentSource == resource.data.assignmentSource
+        && request.resource.data.assignedBy == resource.data.assignedBy
+        && request.resource.data.assignedAt == resource.data.assignedAt
+        && request.resource.data.isActive == false;
+    }
+
     function validOrganizerEmails() {
       return request.resource.data.organizerEmails is list
         && request.resource.data.organizerEmails.size() > 0;
@@ -127,7 +171,11 @@ service cloud.firestore {
 
       match /roles/{roleId} {
         allow read: if isTournamentStaff(tournamentId);
-        allow create, update, delete: if isTournamentOrganizer(tournamentId);
+        allow create: if isTournamentOrganizer(tournamentId)
+          || isVolunteerRoleCreate(tournamentId, roleId);
+        allow update: if isTournamentOrganizer(tournamentId)
+          || canAssistantDeactivateVolunteerReferee(tournamentId);
+        allow delete: if isTournamentOrganizer(tournamentId);
       }
 
       match /entries/{entryId} {
@@ -212,7 +260,8 @@ service cloud.firestore {
     match /categories/{categoryId} {
       allow create: if isTournamentOrganizer(request.resource.data.tournamentId);
       allow read: if isTournamentOrganizer(resource.data.tournamentId)
-        || isTournamentAssistant(resource.data.tournamentId);
+        || isTournamentAssistant(resource.data.tournamentId)
+        || isPublicTournament(resource.data.tournamentId);
       allow update, delete: if isTournamentOrganizer(resource.data.tournamentId);
     }
 

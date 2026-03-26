@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 import '../domain/tournament_role.dart';
 
@@ -69,6 +70,39 @@ final class TournamentRoleRepository {
     await _rolesRef(tournamentId).doc(role.userId).set(role.toMap());
   }
 
+  Future<void> volunteerAsReferee({
+    required String tournamentId,
+    required User user,
+  }) async {
+    final normalizedEmail = _normalizeEmail(user.email);
+    if (normalizedEmail.isEmpty) {
+      throw StateError(
+        'Sign in with a Google account that has an email address.',
+      );
+    }
+
+    final normalizedName = user.displayName?.trim();
+    await _rolesRef(tournamentId)
+        .doc(user.uid)
+        .set(
+          TournamentRole(
+            id: user.uid,
+            tournamentId: tournamentId,
+            userId: user.uid,
+            email: normalizedEmail,
+            displayName: normalizedName?.isNotEmpty == true
+                ? normalizedName!
+                : normalizedEmail,
+            role: TournamentRoleType.referee,
+            isActive: true,
+            assignmentSource: TournamentRoleAssignmentSource.volunteer,
+            assignedAt: null,
+            assignedBy: user.uid,
+          ).toMap(),
+          SetOptions(merge: true),
+        );
+  }
+
   Future<void> removeRole({
     required String tournamentId,
     required String roleId,
@@ -80,8 +114,12 @@ final class TournamentRoleRepository {
     required String tournamentId,
     required String roleId,
   }) async {
-    await _rolesRef(tournamentId).doc(roleId).update(<String, Object>{
-      'isActive': false,
-    });
+    await _rolesRef(
+      tournamentId,
+    ).doc(roleId).update(<String, Object>{'isActive': false});
+  }
+
+  String _normalizeEmail(String? email) {
+    return email?.trim().toLowerCase() ?? '';
   }
 }

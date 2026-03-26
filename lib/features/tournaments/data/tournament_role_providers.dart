@@ -24,7 +24,9 @@ final currentUserRoleProvider = FutureProvider.family<TournamentRole?, String>((
   ref,
   tournamentId,
 ) async {
-  final user = ref.watch(firebaseAuthProvider).currentUser;
+  final authState = ref.watch(authStateChangesProvider);
+  final user =
+      authState.asData?.value ?? ref.watch(firebaseAuthProvider).currentUser;
   if (user == null) {
     return null;
   }
@@ -47,6 +49,7 @@ final currentUserRoleProvider = FutureProvider.family<TournamentRole?, String>((
       displayName: user.displayName ?? 'Organizer',
       role: TournamentRoleType.organizer,
       isActive: true,
+      assignmentSource: TournamentRoleAssignmentSource.organizer,
       assignedAt: null,
       assignedBy: user.uid,
     );

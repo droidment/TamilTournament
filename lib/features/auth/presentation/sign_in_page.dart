@@ -1,18 +1,21 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../theme/app_theme.dart';
+import '../../tournaments/data/tournament_providers.dart';
+import '../../tournaments/domain/tournament.dart';
 
-final class SignInPage extends StatefulWidget {
+final class SignInPage extends ConsumerStatefulWidget {
   const SignInPage({super.key});
 
   @override
-  State<SignInPage> createState() => _SignInPageState();
+  ConsumerState<SignInPage> createState() => _SignInPageState();
 }
 
-class _SignInPageState extends State<SignInPage> {
+class _SignInPageState extends ConsumerState<SignInPage> {
   bool _isLoading = false;
   String? _errorMessage;
 
@@ -53,6 +56,7 @@ class _SignInPageState extends State<SignInPage> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final publicTournamentsAsync = ref.watch(publicTournamentsProvider);
 
     return Scaffold(
       body: Container(
@@ -89,9 +93,7 @@ class _SignInPageState extends State<SignInPage> {
                                 child: _buildHeroContent(theme, isCompact),
                               ),
                               const SizedBox(width: AppSpace.xl),
-                              Expanded(
-                                child: _buildSignInCard(theme),
-                              ),
+                              Expanded(child: _buildSignInCard(theme)),
                             ],
                           )
                         else ...[
@@ -101,6 +103,10 @@ class _SignInPageState extends State<SignInPage> {
                         ],
                         const SizedBox(height: AppSpace.lg),
                         const _StaffAccessSection(),
+                        const SizedBox(height: AppSpace.lg),
+                        _PublicTournamentSection(
+                          tournamentsAsync: publicTournamentsAsync,
+                        ),
                       ],
                     ),
                   ),
@@ -119,10 +125,11 @@ class _SignInPageState extends State<SignInPage> {
       children: [
         Text(
           'Run the tournament from one screen, not five spreadsheets.',
-          style: (isCompact
-                  ? theme.textTheme.headlineLarge
-                  : theme.textTheme.displayLarge)
-              ?.copyWith(fontWeight: FontWeight.w700),
+          style:
+              (isCompact
+                      ? theme.textTheme.headlineLarge
+                      : theme.textTheme.displayLarge)
+                  ?.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: AppSpace.md),
         ConstrainedBox(
@@ -282,10 +289,7 @@ class _StaffAccessSectionState extends State<_StaffAccessSection> {
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            'Staff & spectator access',
-            style: theme.textTheme.titleMedium,
-          ),
+          Text('Staff & spectator access', style: theme.textTheme.titleMedium),
           const SizedBox(height: AppSpace.xs),
           Text(
             'Enter a tournament code to open an assistant, referee, or public view.',
@@ -335,6 +339,159 @@ class _StaffAccessSectionState extends State<_StaffAccessSection> {
           ),
         ],
       ),
+    );
+  }
+}
+
+final class _PublicTournamentSection extends StatelessWidget {
+  const _PublicTournamentSection({required this.tournamentsAsync});
+
+  final AsyncValue<List<Tournament>> tournamentsAsync;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpace.lg),
+      decoration: BoxDecoration(
+        color: AppPalette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        border: Border.all(color: AppPalette.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Published tournaments', style: theme.textTheme.titleMedium),
+          const SizedBox(height: AppSpace.xs),
+          Text(
+            'Public players, spectators, and volunteer referees can open a published tournament directly from here.',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppPalette.inkSoft,
+            ),
+          ),
+          const SizedBox(height: AppSpace.md),
+          tournamentsAsync.when(
+            data: (tournaments) {
+              if (tournaments.isEmpty) {
+                return const _LandingEmptyState(
+                  title: 'No public tournaments yet',
+                  message:
+                      'Once an organizer publishes a tournament, it will appear here.',
+                );
+              }
+
+              return Column(
+                children: [
+                  for (var index = 0; index < tournaments.length; index++) ...[
+                    _PublicTournamentRow(tournament: tournaments[index]),
+                    if (index < tournaments.length - 1)
+                      const Divider(
+                        height: AppSpace.lg,
+                        color: AppPalette.line,
+                      ),
+                  ],
+                ],
+              );
+            },
+            loading: () => const Padding(
+              padding: EdgeInsets.symmetric(vertical: AppSpace.md),
+              child: Center(child: CircularProgressIndicator()),
+            ),
+            error: (error, _) => _LandingEmptyState(
+              title: 'Could not load published tournaments',
+              message: error.toString(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+final class _PublicTournamentRow extends StatelessWidget {
+  const _PublicTournamentRow({required this.tournament});
+
+  final Tournament tournament;
+
+  @override
+  Widget build(BuildContext context) {
+    final publicCode = (tournament.publicSlug?.trim().isNotEmpty ?? false)
+        ? tournament.publicSlug!.trim()
+        : tournament.id;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                tournament.name,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                '${tournament.venue} • ${_formatDate(tournament.startDate)}',
+                style: Theme.of(
+                  context,
+                ).textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
+              ),
+              const SizedBox(height: AppSpace.sm),
+              Wrap(
+                spacing: AppSpace.xs,
+                runSpacing: AppSpace.xs,
+                children: [
+                  _InfoChip(
+                    label: 'Code: $publicCode',
+                    tint: AppPalette.skySoft,
+                    textColor: const Color(0xFF456F77),
+                  ),
+                  if (tournament.acceptingVolunteerReferees)
+                    const _InfoChip(
+                      label: 'Volunteer referees open',
+                      tint: AppPalette.apricotSoft,
+                      textColor: Color(0xFF8F6038),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: AppSpace.md),
+        FilledButton.tonal(
+          onPressed: () => context.go('/p/$publicCode'),
+          child: const Text('Open'),
+        ),
+      ],
+    );
+  }
+}
+
+final class _LandingEmptyState extends StatelessWidget {
+  const _LandingEmptyState({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpace.xs),
+        Text(
+          message,
+          style: Theme.of(
+            context,
+          ).textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
+        ),
+      ],
     );
   }
 }
@@ -417,4 +574,22 @@ final class _InfoChip extends StatelessWidget {
       ),
     );
   }
+}
+
+String _formatDate(DateTime value) {
+  const months = <String>[
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+  ];
+  return '${months[value.month - 1]} ${value.day}, ${value.year}';
 }

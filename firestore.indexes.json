@@ -1,6 +1,20 @@
 {
   "indexes": [
     {
+      "collectionGroup": "tournaments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "publicSlug",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "isPublic",
+          "order": "ASCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "scoreSubmissions",
       "queryScope": "COLLECTION",
       "fields": [

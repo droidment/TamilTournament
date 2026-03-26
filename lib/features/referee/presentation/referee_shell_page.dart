@@ -5,10 +5,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../../theme/app_theme.dart';
 import '../../auth/data/auth_providers.dart';
+import '../../scheduler/data/court_providers.dart';
 import '../../scheduler/data/referee_flow_providers.dart';
 import '../../scheduler/data/score_submission_providers.dart';
 import '../../scheduler/data/tournament_match_providers.dart';
 import '../../scheduler/domain/score_submission.dart';
+import '../../scheduler/domain/tournament_court.dart';
 import '../../scheduler/domain/tournament_match.dart';
 import '../../tournaments/data/tournament_role_providers.dart';
 import '../../tournaments/data/tournament_providers.dart';
@@ -41,10 +43,15 @@ class _RefereeShellPageState extends ConsumerState<RefereeShellPage> {
     final matchesAsync = ref.watch(
       tournamentMatchesProvider(widget.tournamentId),
     );
-    final tournamentAsync = ref.watch(tournamentByIdProvider(widget.tournamentId));
+    final courtsAsync = ref.watch(
+      tournamentCourtsProvider(widget.tournamentId),
+    );
+    final tournamentAsync = ref.watch(
+      tournamentByIdProvider(widget.tournamentId),
+    );
     final tournamentName =
         tournamentAsync.asData?.value?.name ?? widget.tournamentId;
-    final error = roleAsync.error ?? matchesAsync.error;
+    final error = roleAsync.error ?? matchesAsync.error ?? courtsAsync.error;
 
     if (error != null) {
       return _RefereeScaffold(
@@ -58,7 +65,9 @@ class _RefereeShellPageState extends ConsumerState<RefereeShellPage> {
       );
     }
 
-    if (roleAsync.isLoading || matchesAsync.isLoading) {
+    if (roleAsync.isLoading ||
+        matchesAsync.isLoading ||
+        courtsAsync.isLoading) {
       return const _RefereeScaffold(
         roleLabel: 'Referee',
         tournamentName: null,
@@ -81,6 +90,7 @@ class _RefereeShellPageState extends ConsumerState<RefereeShellPage> {
     }
 
     final matches = matchesAsync.value ?? const <TournamentMatch>[];
+    final courts = courtsAsync.value ?? const <TournamentCourt>[];
     final visibleMatches = matches
         .where(
           (match) =>
@@ -106,6 +116,10 @@ class _RefereeShellPageState extends ConsumerState<RefereeShellPage> {
                         false);
               })
               .toList(growable: false);
+    final matchByCourtId = <String, TournamentMatch>{
+      for (final match in visibleMatches)
+        if (match.assignedCourtId != null) match.assignedCourtId!: match,
+    };
 
     return _RefereeScaffold(
       roleLabel: role.role.label,
@@ -115,6 +129,7 @@ class _RefereeShellPageState extends ConsumerState<RefereeShellPage> {
         children: [
           _RefereeHero(
             tournamentName: tournamentName,
+            courtCount: courts.where((court) => court.isAvailable).length,
             activeCount: visibleMatches.length,
             submittedCount: visibleMatches
                 .where((match) => match.isScoreSubmitted)
@@ -134,6 +149,8 @@ class _RefereeShellPageState extends ConsumerState<RefereeShellPage> {
               prefixIcon: Icon(Icons.search),
             ),
           ),
+          const SizedBox(height: AppSpace.lg),
+          _RefereeCourtBoard(courts: courts, matchByCourtId: matchByCourtId),
           const SizedBox(height: AppSpace.lg),
           if (_submittedMatchId != null)
             Padding(
@@ -299,11 +316,13 @@ final class _RefereeScaffold extends StatelessWidget {
 final class _RefereeHero extends StatelessWidget {
   const _RefereeHero({
     required this.tournamentName,
+    required this.courtCount,
     required this.activeCount,
     required this.submittedCount,
   });
 
   final String tournamentName;
+  final int courtCount;
   final int activeCount;
   final int submittedCount;
 
@@ -320,10 +339,7 @@ final class _RefereeHero extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            tournamentName,
-            style: Theme.of(context).textTheme.titleLarge,
-          ),
+          Text(tournamentName, style: Theme.of(context).textTheme.titleLarge),
           const SizedBox(height: AppSpace.xs),
           Text(
             'Submit official scores from court-side and leave approval to assistant or organizer staff.',
@@ -336,6 +352,7 @@ final class _RefereeHero extends StatelessWidget {
             spacing: AppSpace.sm,
             runSpacing: AppSpace.sm,
             children: [
+              _RefereeChip(label: 'Courts in view', value: '$courtCount'),
               _RefereeChip(label: 'Visible matches', value: '$activeCount'),
               _RefereeChip(
                 label: 'Submitted in view',
@@ -345,6 +362,86 @@ final class _RefereeHero extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+final class _RefereeCourtBoard extends StatelessWidget {
+  const _RefereeCourtBoard({
+    required this.courts,
+    required this.matchByCourtId,
+  });
+
+  final List<TournamentCourt> courts;
+  final Map<String, TournamentMatch> matchByCourtId;
+
+  @override
+  Widget build(BuildContext context) {
+    if (courts.isEmpty) {
+      return const _RefereeEmptyState(
+        title: 'Court lookup not ready',
+        message: 'Courts will appear here once the organizer configures them.',
+        icon: Icons.grid_view_outlined,
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          'Court lookup board',
+          style: Theme.of(context).textTheme.titleLarge,
+        ),
+        const SizedBox(height: AppSpace.xs),
+        Text(
+          'Use the court board to find active referee work before searching for a specific match.',
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppPalette.inkSoft),
+        ),
+        const SizedBox(height: AppSpace.md),
+        Wrap(
+          spacing: AppSpace.sm,
+          runSpacing: AppSpace.sm,
+          children: courts.map((court) {
+            final match = matchByCourtId[court.id];
+            return Container(
+              width: 220,
+              padding: const EdgeInsets.all(AppSpace.md),
+              decoration: BoxDecoration(
+                color: AppPalette.surface,
+                borderRadius: BorderRadius.circular(AppRadii.panel),
+                border: Border.all(color: AppPalette.line),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    court.code,
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: AppSpace.xs),
+                  _RefereeStatusBadge(
+                    label: match?.status.label ?? court.status.label,
+                    color: match == null
+                        ? (court.isAvailable ? Colors.teal : Colors.orange)
+                        : _statusColor(match.status),
+                  ),
+                  const SizedBox(height: AppSpace.sm),
+                  Text(
+                    match == null
+                        ? (court.isAvailable
+                              ? 'Open court'
+                              : 'Court unavailable')
+                        : '${match.teamOneLabel} vs ${match.teamTwoLabel}',
+                    style: Theme.of(context).textTheme.bodyMedium,
+                  ),
+                ],
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 }

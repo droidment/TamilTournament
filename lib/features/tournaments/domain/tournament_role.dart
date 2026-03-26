@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum TournamentRoleType { organizer, assistant, referee }
 
+enum TournamentRoleAssignmentSource { organizer, volunteer }
+
 extension TournamentRoleTypeX on TournamentRoleType {
   String get value => switch (this) {
     TournamentRoleType.organizer => 'organizer',
@@ -22,6 +24,24 @@ extension TournamentRoleTypeX on TournamentRoleType {
   };
 }
 
+extension TournamentRoleAssignmentSourceX on TournamentRoleAssignmentSource {
+  String get value => switch (this) {
+    TournamentRoleAssignmentSource.organizer => 'organizer',
+    TournamentRoleAssignmentSource.volunteer => 'volunteer',
+  };
+
+  String get label => switch (this) {
+    TournamentRoleAssignmentSource.organizer => 'Assigned',
+    TournamentRoleAssignmentSource.volunteer => 'Volunteer',
+  };
+
+  static TournamentRoleAssignmentSource fromValue(String value) =>
+      switch (value) {
+        'volunteer' => TournamentRoleAssignmentSource.volunteer,
+        _ => TournamentRoleAssignmentSource.organizer,
+      };
+}
+
 final class TournamentRole {
   const TournamentRole({
     required this.id,
@@ -31,6 +51,7 @@ final class TournamentRole {
     required this.displayName,
     required this.role,
     required this.isActive,
+    required this.assignmentSource,
     required this.assignedAt,
     required this.assignedBy,
   });
@@ -42,6 +63,7 @@ final class TournamentRole {
   final String displayName;
   final TournamentRoleType role;
   final bool isActive;
+  final TournamentRoleAssignmentSource assignmentSource;
   final DateTime? assignedAt;
   final String assignedBy;
 
@@ -58,6 +80,9 @@ final class TournamentRole {
       displayName: data['displayName'] as String? ?? '',
       role: TournamentRoleTypeX.fromValue(data['role'] as String? ?? ''),
       isActive: data['isActive'] as bool? ?? true,
+      assignmentSource: TournamentRoleAssignmentSourceX.fromValue(
+        data['assignmentSource'] as String? ?? 'organizer',
+      ),
       assignedAt: (data['assignedAt'] as Timestamp?)?.toDate(),
       assignedBy: data['assignedBy'] as String? ?? '',
     );
@@ -70,6 +95,7 @@ final class TournamentRole {
       'displayName': displayName,
       'role': role.value,
       'isActive': isActive,
+      'assignmentSource': assignmentSource.value,
       'assignedAt': assignedAt != null
           ? Timestamp.fromDate(assignedAt!)
           : FieldValue.serverTimestamp(),

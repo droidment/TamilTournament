@@ -46,7 +46,7 @@ final class TournamentRepository {
         <String, Tournament>{
             if (directSnapshot != null)
               for (final doc in directSnapshot.docs)
-              doc.id: Tournament.fromDocument(doc),
+                doc.id: Tournament.fromDocument(doc),
             if (sharedSnapshot != null)
               for (final doc in sharedSnapshot.docs)
                 doc.id: Tournament.fromDocument(doc),
@@ -72,12 +72,13 @@ final class TournamentRepository {
 
         final merged =
             <String, Tournament>{
-                for (final tournament in directTournaments)
-                  tournament.id: tournament,
-                for (final tournament in sharedTournaments)
-                  tournament.id: tournament,
-              }.values.toList(growable: false)
-              ..sort((left, right) => right.startDate.compareTo(left.startDate));
+              for (final tournament in directTournaments)
+                tournament.id: tournament,
+              for (final tournament in sharedTournaments)
+                tournament.id: tournament,
+            }.values.toList(growable: false)..sort(
+              (left, right) => right.startDate.compareTo(left.startDate),
+            );
         controller.add(merged);
       }
 
@@ -133,6 +134,40 @@ final class TournamentRepository {
     });
   }
 
+  Future<Tournament?> loadPublicTournamentByCode({required String code}) async {
+    final normalizedCode = _normalizePublicCode(code);
+    if (normalizedCode.isEmpty) {
+      return null;
+    }
+
+    final slugSnapshot = await _tournaments
+        .where('publicSlug', isEqualTo: normalizedCode)
+        .where('isPublic', isEqualTo: true)
+        .limit(1)
+        .get();
+    if (slugSnapshot.docs.isNotEmpty) {
+      return Tournament.fromDocument(slugSnapshot.docs.first);
+    }
+
+    final directSnapshot = await _tournaments.doc(normalizedCode).get();
+    if (!directSnapshot.exists) {
+      return null;
+    }
+
+    final tournament = Tournament.fromDocument(directSnapshot);
+    return tournament.isPublic ? tournament : null;
+  }
+
+  Future<List<Tournament>> loadPublicTournaments() async {
+    final snapshot = await _tournaments
+        .where('isPublic', isEqualTo: true)
+        .get();
+    final tournaments =
+        snapshot.docs.map(Tournament.fromDocument).toList(growable: false)
+          ..sort((left, right) => right.startDate.compareTo(left.startDate));
+    return tournaments;
+  }
+
   Future<void> createDraftTournament({
     required String organizerUid,
     required String organizerEmail,
@@ -150,6 +185,8 @@ final class TournamentRepository {
       'organizerEmails': [normalizedEmail],
       'status': TournamentStatus.draft.value,
       'activeCourtCount': 0,
+      'isPublic': false,
+      'acceptingVolunteerReferees': false,
       'stats': const TournamentStats(
         categories: 0,
         entries: 0,
@@ -185,6 +222,20 @@ final class TournamentRepository {
     });
   }
 
+  Future<void> updatePublicAccess({
+    required String tournamentId,
+    required bool isPublic,
+    required bool acceptingVolunteerReferees,
+  }) async {
+    await _tournaments.doc(tournamentId).update(<String, Object?>{
+      'isPublic': isPublic,
+      'acceptingVolunteerReferees': isPublic
+          ? acceptingVolunteerReferees
+          : false,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   bool _canAccessTournament({
     required Tournament tournament,
     required String organizerUid,
@@ -199,5 +250,9 @@ final class TournamentRepository {
 
   String _normalizeOrganizerEmail(String email) {
     return email.trim().toLowerCase();
+  }
+
+  String _normalizePublicCode(String value) {
+    return value.trim().toLowerCase();
   }
 }

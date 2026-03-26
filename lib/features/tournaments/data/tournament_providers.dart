@@ -14,7 +14,9 @@ final tournamentRepositoryProvider = Provider<TournamentRepository>((ref) {
 });
 
 final ownedTournamentsProvider = FutureProvider<List<Tournament>>((ref) async {
-  final user = ref.watch(firebaseAuthProvider).currentUser;
+  final authState = ref.watch(authStateChangesProvider);
+  final user =
+      authState.asData?.value ?? ref.watch(firebaseAuthProvider).currentUser;
   final email = user?.email;
   if (user == null || email == null || email.trim().isEmpty) {
     return const <Tournament>[];
@@ -28,7 +30,9 @@ final tournamentByIdProvider = StreamProvider.family<Tournament?, String>((
   ref,
   tournamentId,
 ) {
-  final user = ref.watch(firebaseAuthProvider).currentUser;
+  final authState = ref.watch(authStateChangesProvider);
+  final user =
+      authState.asData?.value ?? ref.watch(firebaseAuthProvider).currentUser;
   final email = user?.email;
   if (user == null || email == null || email.trim().isEmpty) {
     return Stream.value(null);
@@ -40,4 +44,15 @@ final tournamentByIdProvider = StreamProvider.family<Tournament?, String>((
         organizerUid: user.uid,
         organizerEmail: email,
       );
+});
+
+final publicTournamentByCodeProvider =
+    FutureProvider.family<Tournament?, String>((ref, code) {
+      return ref
+          .watch(tournamentRepositoryProvider)
+          .loadPublicTournamentByCode(code: code);
+    });
+
+final publicTournamentsProvider = FutureProvider<List<Tournament>>((ref) {
+  return ref.watch(tournamentRepositoryProvider).loadPublicTournaments();
 });

@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../theme/app_theme.dart';
 import '../data/tournament_providers.dart';
@@ -28,6 +29,9 @@ final class OrganizersSection extends ConsumerStatefulWidget {
 class _OrganizersSectionState extends ConsumerState<OrganizersSection> {
   bool _isAddingOrganizer = false;
   bool _isAddingAssistant = false;
+  bool _isAddingReferee = false;
+  bool _isUpdatingPublicAccess = false;
+  String? _busyRoleId;
 
   Future<void> _showAddOrganizerDialog() async {
     final addedEmail = await showDialog<String>(
@@ -141,6 +145,7 @@ class _OrganizersSectionState extends ConsumerState<OrganizersSection> {
               displayName: normalizedEmail,
               role: TournamentRoleType.assistant,
               isActive: true,
+              assignmentSource: TournamentRoleAssignmentSource.organizer,
               assignedAt: null,
               assignedBy: currentUser?.uid ?? '',
             ),
@@ -169,6 +174,168 @@ class _OrganizersSectionState extends ConsumerState<OrganizersSection> {
     }
   }
 
+  Future<void> _showAddRefereeDialog(List<TournamentRole> roles) async {
+    final addedEmail = await showDialog<String>(
+      context: context,
+      builder: (context) => const _RoleEmailDialog(
+        title: 'Add referee',
+        description:
+            'Assign a referee by the Google email they use to sign in.',
+        fieldLabel: 'Referee email',
+        fieldHint: 'referee@example.com',
+        confirmLabel: 'Add referee',
+        emptyMessage: 'Enter a referee email.',
+      ),
+    );
+
+    if (addedEmail == null || !mounted) {
+      return;
+    }
+
+    final normalizedEmail = addedEmail.trim().toLowerCase();
+    final existingReferee = roles.any(
+      (role) =>
+          role.role == TournamentRoleType.referee &&
+          role.isActive &&
+          role.email.trim().toLowerCase() == normalizedEmail,
+    );
+    if (existingReferee) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$normalizedEmail is already a referee.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isAddingReferee = true;
+    });
+
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      await ref
+          .read(tournamentRoleRepositoryProvider)
+          .addRole(
+            tournamentId: widget.tournament.id,
+            role: TournamentRole(
+              id: normalizedEmail,
+              tournamentId: widget.tournament.id,
+              userId: normalizedEmail,
+              email: normalizedEmail,
+              displayName: normalizedEmail,
+              role: TournamentRoleType.referee,
+              isActive: true,
+              assignmentSource: TournamentRoleAssignmentSource.organizer,
+              assignedAt: null,
+              assignedBy: currentUser?.uid ?? '',
+            ),
+          );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$normalizedEmail can now open the referee desk.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_friendlyOrganizerError(error))));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAddingReferee = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _updatePublicAccess({
+    required bool isPublic,
+    required bool acceptingVolunteerReferees,
+  }) async {
+    if (_isUpdatingPublicAccess) {
+      return;
+    }
+    setState(() {
+      _isUpdatingPublicAccess = true;
+    });
+    try {
+      await ref
+          .read(tournamentRepositoryProvider)
+          .updatePublicAccess(
+            tournamentId: widget.tournament.id,
+            isPublic: isPublic,
+            acceptingVolunteerReferees: acceptingVolunteerReferees,
+          );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            isPublic
+                ? acceptingVolunteerReferees
+                      ? 'Public view is live and volunteer referees are enabled.'
+                      : 'Public view is live.'
+                : 'Public view is now hidden.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_friendlyOrganizerError(error))));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isUpdatingPublicAccess = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _deactivateRole(TournamentRole role) async {
+    if (_busyRoleId != null) {
+      return;
+    }
+    setState(() {
+      _busyRoleId = role.id;
+    });
+    try {
+      await ref
+          .read(tournamentRoleRepositoryProvider)
+          .deactivateRole(tournamentId: widget.tournament.id, roleId: role.id);
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${role.email} no longer has referee desk access.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_friendlyOrganizerError(error))));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _busyRoleId = null;
+        });
+      }
+    }
+  }
+
   Set<String> get _displayOrganizerEmails {
     final emails = widget.tournament.organizerEmails
         .map((email) => email.trim().toLowerCase())
@@ -188,16 +355,46 @@ class _OrganizersSectionState extends ConsumerState<OrganizersSection> {
     final rolesAsync = ref.watch(tournamentRolesProvider(widget.tournament.id));
     final organizerEmails = _displayOrganizerEmails.toList(growable: false)
       ..sort();
+    final publicCode =
+        (widget.tournament.publicSlug?.trim().isNotEmpty ?? false)
+        ? widget.tournament.publicSlug!.trim()
+        : widget.tournament.id;
     final assistantRoles = rolesAsync.maybeWhen(
-      data: (roles) => roles
-          .where(
-            (role) =>
-                role.role == TournamentRoleType.assistant && role.isActive,
-          )
-          .toList(growable: false)
-        ..sort((left, right) => left.email.compareTo(right.email)),
+      data: (roles) =>
+          roles
+              .where(
+                (role) =>
+                    role.role == TournamentRoleType.assistant && role.isActive,
+              )
+              .toList(growable: false)
+            ..sort((left, right) => left.email.compareTo(right.email)),
       orElse: () => const <TournamentRole>[],
     );
+    final refereeRoles = rolesAsync.maybeWhen(
+      data: (roles) =>
+          roles
+              .where((role) => role.role == TournamentRoleType.referee)
+              .toList(growable: false)
+            ..sort((left, right) {
+              if (left.isActive != right.isActive) {
+                return right.isActive ? 1 : -1;
+              }
+              return left.email.compareTo(right.email);
+            }),
+      orElse: () => const <TournamentRole>[],
+    );
+    final organizerAssignedReferees = refereeRoles
+        .where(
+          (role) =>
+              role.assignmentSource == TournamentRoleAssignmentSource.organizer,
+        )
+        .toList(growable: false);
+    final volunteeredReferees = refereeRoles
+        .where(
+          (role) =>
+              role.assignmentSource == TournamentRoleAssignmentSource.volunteer,
+        )
+        .toList(growable: false);
     final currentUserEmail = FirebaseAuth.instance.currentUser?.email
         ?.trim()
         .toLowerCase();
@@ -205,6 +402,88 @@ class _OrganizersSectionState extends ConsumerState<OrganizersSection> {
     final content = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        WorkspaceSectionLead(
+          title: 'Public & volunteer access',
+          description:
+              'Publish the tournament page for players and spectators, then choose whether signed-in visitors can volunteer as referees.',
+          icon: Icons.public,
+          accent: AppPalette.sky,
+          trailing: FilledButton.tonalIcon(
+            onPressed: widget.tournament.isPublic
+                ? () => context.go('/p/$publicCode')
+                : null,
+            icon: const Icon(Icons.open_in_new_rounded),
+            label: const Text('Open public view'),
+          ),
+        ),
+        const SizedBox(height: AppSpace.md),
+        WorkspaceSurfaceCard(
+          padding: const EdgeInsets.all(AppSpace.md),
+          radius: 16,
+          accent: AppPalette.sky,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _ToggleAccessRow(
+                title: 'Public tournament page',
+                description:
+                    'Lets players and spectators open the tournament by public code and follow official results live.',
+                value: widget.tournament.isPublic,
+                isBusy: _isUpdatingPublicAccess,
+                onChanged: widget.readOnly
+                    ? null
+                    : (value) => _updatePublicAccess(
+                        isPublic: value,
+                        acceptingVolunteerReferees: value
+                            ? widget.tournament.acceptingVolunteerReferees
+                            : false,
+                      ),
+              ),
+              const Divider(height: AppSpace.lg, color: AppPalette.line),
+              _ToggleAccessRow(
+                title: 'Volunteer referees',
+                description: widget.tournament.isPublic
+                    ? 'Signed-in visitors can immediately volunteer and unlock the referee desk.'
+                    : 'Turn on the public tournament page first to accept volunteer referees.',
+                value:
+                    widget.tournament.isPublic &&
+                    widget.tournament.acceptingVolunteerReferees,
+                isBusy: _isUpdatingPublicAccess,
+                onChanged: widget.readOnly || !widget.tournament.isPublic
+                    ? null
+                    : (value) => _updatePublicAccess(
+                        isPublic: true,
+                        acceptingVolunteerReferees: value,
+                      ),
+              ),
+              const SizedBox(height: AppSpace.md),
+              Wrap(
+                spacing: AppSpace.sm,
+                runSpacing: AppSpace.sm,
+                children: [
+                  _OrganizerBadge(
+                    label: widget.tournament.isPublic
+                        ? 'Public code: $publicCode'
+                        : 'Private tournament',
+                    foreground: widget.tournament.isPublic
+                        ? const Color(0xFF456F77)
+                        : AppPalette.inkSoft,
+                    background: widget.tournament.isPublic
+                        ? AppPalette.skySoft
+                        : AppPalette.surfaceSoft,
+                  ),
+                  if (widget.tournament.acceptingVolunteerReferees)
+                    const _OrganizerBadge(
+                      label: 'Volunteers open',
+                      foreground: Color(0xFF365141),
+                      background: Color(0xFFE7F4EE),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: AppSpace.lg),
         WorkspaceSectionLead(
           title: 'Organizer access',
           description:
@@ -278,12 +557,22 @@ class _OrganizersSectionState extends ConsumerState<OrganizersSection> {
                   )
                 : Column(
                     children: [
-                      for (var index = 0; index < assistantRoles.length; index++) ...[
+                      for (
+                        var index = 0;
+                        index < assistantRoles.length;
+                        index++
+                      ) ...[
                         _RoleAccessRow(
                           email: assistantRoles[index].email,
                           isCurrentUser:
                               assistantRoles[index].email == currentUserEmail,
-                          badgeLabel: 'Assistant',
+                          badges: const [
+                            _OrganizerBadge(
+                              label: 'Assistant',
+                              foreground: Color(0xFF365141),
+                              background: Color(0xFFE7F4EE),
+                            ),
+                          ],
                         ),
                         if (index < assistantRoles.length - 1)
                           const Divider(
@@ -296,6 +585,66 @@ class _OrganizersSectionState extends ConsumerState<OrganizersSection> {
             loading: () => const Center(child: CircularProgressIndicator()),
             error: (error, _) => _AccessEmptyState(
               title: 'Could not load assistant access',
+              message: _friendlyOrganizerError(error),
+            ),
+          ),
+        ),
+        const SizedBox(height: AppSpace.lg),
+        WorkspaceSectionLead(
+          title: 'Referee access',
+          description:
+              'Manage staff-assigned referees and people who volunteered from the public tournament page.',
+          icon: Icons.sports_tennis,
+          accent: AppPalette.apricot,
+          trailing: FilledButton.icon(
+            onPressed: widget.readOnly || _isAddingReferee
+                ? null
+                : () => _showAddRefereeDialog(refereeRoles),
+            icon: _isAddingReferee
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.person_add_alt_1_rounded),
+            label: Text(_isAddingReferee ? 'Adding...' : 'Add referee'),
+          ),
+        ),
+        const SizedBox(height: AppSpace.md),
+        WorkspaceSurfaceCard(
+          padding: const EdgeInsets.all(AppSpace.md),
+          radius: 16,
+          accent: AppPalette.apricot,
+          child: rolesAsync.when(
+            data: (_) => refereeRoles.isEmpty
+                ? const _AccessEmptyState(
+                    title: 'No referees added yet',
+                    message:
+                        'Assign a referee by email or let signed-in visitors volunteer once the public page is live.',
+                  )
+                : Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _RoleGroupBlock(
+                        title: 'Organizer-assigned',
+                        roles: organizerAssignedReferees,
+                        currentUserEmail: currentUserEmail,
+                        busyRoleId: _busyRoleId,
+                        onDeactivate: widget.readOnly ? null : _deactivateRole,
+                      ),
+                      const SizedBox(height: AppSpace.lg),
+                      _RoleGroupBlock(
+                        title: 'Volunteered',
+                        roles: volunteeredReferees,
+                        currentUserEmail: currentUserEmail,
+                        busyRoleId: _busyRoleId,
+                        onDeactivate: widget.readOnly ? null : _deactivateRole,
+                      ),
+                    ],
+                  ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, _) => _AccessEmptyState(
+              title: 'Could not load referee access',
               message: _friendlyOrganizerError(error),
             ),
           ),
@@ -383,12 +732,16 @@ final class _RoleAccessRow extends StatelessWidget {
   const _RoleAccessRow({
     required this.email,
     required this.isCurrentUser,
-    required this.badgeLabel,
+    required this.badges,
+    this.trailing,
+    this.icon = Icons.assignment_ind,
   });
 
   final String email;
   final bool isCurrentUser;
-  final String badgeLabel;
+  final List<_OrganizerBadge> badges;
+  final Widget? trailing;
+  final IconData icon;
 
   @override
   Widget build(BuildContext context) {
@@ -409,11 +762,7 @@ final class _RoleAccessRow extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: AppPalette.line),
           ),
-          child: const Icon(
-            Icons.assignment_ind,
-            size: 18,
-            color: AppPalette.inkSoft,
-          ),
+          child: Icon(icon, size: 18, color: AppPalette.inkSoft),
         ),
         const SizedBox(width: AppSpace.md),
         Expanded(
@@ -431,11 +780,7 @@ final class _RoleAccessRow extends StatelessWidget {
                 spacing: AppSpace.xs,
                 runSpacing: AppSpace.xs,
                 children: [
-                  _OrganizerBadge(
-                    label: badgeLabel,
-                    foreground: const Color(0xFF365141),
-                    background: const Color(0xFFE7F4EE),
-                  ),
+                  ...badges,
                   if (isCurrentUser)
                     const _OrganizerBadge(
                       label: 'You',
@@ -447,6 +792,134 @@ final class _RoleAccessRow extends StatelessWidget {
             ],
           ),
         ),
+        if (trailing != null) ...[
+          const SizedBox(width: AppSpace.md),
+          trailing!,
+        ],
+      ],
+    );
+  }
+}
+
+final class _RoleGroupBlock extends StatelessWidget {
+  const _RoleGroupBlock({
+    required this.title,
+    required this.roles,
+    required this.currentUserEmail,
+    required this.busyRoleId,
+    required this.onDeactivate,
+  });
+
+  final String title;
+  final List<TournamentRole> roles;
+  final String? currentUserEmail;
+  final String? busyRoleId;
+  final ValueChanged<TournamentRole>? onDeactivate;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpace.sm),
+        if (roles.isEmpty)
+          const _AccessEmptyState(
+            title: 'Nothing here yet',
+            message: 'This group will populate once referee access is added.',
+          )
+        else
+          Column(
+            children: [
+              for (var index = 0; index < roles.length; index++) ...[
+                _RoleAccessRow(
+                  email: roles[index].email,
+                  isCurrentUser: roles[index].email == currentUserEmail,
+                  icon: Icons.sports_tennis,
+                  badges: [
+                    _OrganizerBadge(
+                      label: roles[index].assignmentSource.label,
+                      foreground:
+                          roles[index].assignmentSource ==
+                              TournamentRoleAssignmentSource.volunteer
+                          ? const Color(0xFF8F6038)
+                          : const Color(0xFF365141),
+                      background:
+                          roles[index].assignmentSource ==
+                              TournamentRoleAssignmentSource.volunteer
+                          ? AppPalette.apricotSoft
+                          : const Color(0xFFE7F4EE),
+                    ),
+                    _OrganizerBadge(
+                      label: roles[index].isActive ? 'Active' : 'Inactive',
+                      foreground: roles[index].isActive
+                          ? const Color(0xFF365141)
+                          : AppPalette.inkSoft,
+                      background: roles[index].isActive
+                          ? const Color(0xFFE7F4EE)
+                          : AppPalette.surfaceSoft,
+                    ),
+                  ],
+                  trailing: roles[index].isActive && onDeactivate != null
+                      ? OutlinedButton(
+                          onPressed: busyRoleId == roles[index].id
+                              ? null
+                              : () => onDeactivate!(roles[index]),
+                          child: Text(
+                            busyRoleId == roles[index].id
+                                ? 'Updating...'
+                                : 'Deactivate',
+                          ),
+                        )
+                      : null,
+                ),
+                if (index < roles.length - 1)
+                  const Divider(height: AppSpace.lg, color: AppPalette.line),
+              ],
+            ],
+          ),
+      ],
+    );
+  }
+}
+
+final class _ToggleAccessRow extends StatelessWidget {
+  const _ToggleAccessRow({
+    required this.title,
+    required this.description,
+    required this.value,
+    required this.isBusy,
+    required this.onChanged,
+  });
+
+  final String title;
+  final String description;
+  final bool value;
+  final bool isBusy;
+  final ValueChanged<bool>? onChanged;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title, style: Theme.of(context).textTheme.titleMedium),
+              const SizedBox(height: AppSpace.xs),
+              Text(
+                description,
+                style: Theme.of(
+                  context,
+                ).textTheme.bodyMedium?.copyWith(color: AppPalette.inkSoft),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(width: AppSpace.md),
+        Switch.adaptive(value: value, onChanged: isBusy ? null : onChanged),
       ],
     );
   }

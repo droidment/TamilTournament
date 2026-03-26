@@ -67,6 +67,7 @@ final class Tournament {
     required this.publicSlug,
     required this.isPublic,
     required this.publicStatus,
+    required this.acceptingVolunteerReferees,
     required this.createdAt,
     required this.updatedAt,
   });
@@ -83,6 +84,7 @@ final class Tournament {
   final String? publicSlug;
   final bool isPublic;
   final String? publicStatus;
+  final bool acceptingVolunteerReferees;
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
@@ -111,6 +113,8 @@ final class Tournament {
       publicSlug: data['publicSlug'] as String?,
       isPublic: data['isPublic'] as bool? ?? false,
       publicStatus: data['publicStatus'] as String?,
+      acceptingVolunteerReferees:
+          data['acceptingVolunteerReferees'] as bool? ?? false,
       createdAt: (data['createdAt'] as Timestamp?)?.toDate(),
       updatedAt: (data['updatedAt'] as Timestamp?)?.toDate(),
     );
