@@ -287,7 +287,7 @@ final class _RoleViewButtons extends StatelessWidget {
           children: [
             _RoleViewChip(
               label: 'Assistant',
-              icon: Icons.assignment_ind_outlined,
+              icon: Icons.assignment_ind,
               tint: Colors.teal.shade50,
               border: Colors.teal.shade200,
               foreground: Colors.teal.shade700,
@@ -295,7 +295,7 @@ final class _RoleViewButtons extends StatelessWidget {
             ),
             _RoleViewChip(
               label: 'Referee',
-              icon: Icons.sports_outlined,
+              icon: Icons.sports_tennis,
               tint: Colors.orange.shade50,
               border: Colors.orange.shade200,
               foreground: Colors.orange.shade700,
@@ -305,7 +305,7 @@ final class _RoleViewButtons extends StatelessWidget {
                 tournament.publicSlug!.isNotEmpty)
               _RoleViewChip(
                 label: 'Public',
-                icon: Icons.public_outlined,
+                icon: Icons.public,
                 tint: Colors.blue.shade50,
                 border: Colors.blue.shade200,
                 foreground: Colors.blue.shade700,
@@ -314,7 +314,7 @@ final class _RoleViewButtons extends StatelessWidget {
             else
               _RoleViewChip(
                 label: 'Public',
-                icon: Icons.public_outlined,
+                icon: Icons.public,
                 tint: Colors.blue.shade50,
                 border: Colors.blue.shade200,
                 foreground: Colors.blue.shade700,

@@ -309,7 +309,7 @@ class _StaffAccessSectionState extends State<_StaffAccessSection> {
             children: [
               _RoleLinkChip(
                 label: 'Assistant',
-                icon: Icons.assignment_ind_outlined,
+                icon: Icons.assignment_ind,
                 tint: Colors.teal.shade50,
                 border: Colors.teal.shade200,
                 foreground: Colors.teal.shade700,
@@ -317,7 +317,7 @@ class _StaffAccessSectionState extends State<_StaffAccessSection> {
               ),
               _RoleLinkChip(
                 label: 'Referee',
-                icon: Icons.sports_outlined,
+                icon: Icons.sports_tennis,
                 tint: Colors.orange.shade50,
                 border: Colors.orange.shade200,
                 foreground: Colors.orange.shade700,
@@ -325,7 +325,7 @@ class _StaffAccessSectionState extends State<_StaffAccessSection> {
               ),
               _RoleLinkChip(
                 label: 'Public',
-                icon: Icons.public_outlined,
+                icon: Icons.public,
                 tint: Colors.blue.shade50,
                 border: Colors.blue.shade200,
                 foreground: Colors.blue.shade700,
