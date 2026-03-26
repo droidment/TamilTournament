@@ -106,40 +106,15 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
         final roleAsync = user == null
             ? const AsyncValue<TournamentRole?>.data(null)
             : ref.watch(currentUserRoleProvider(tournament.id));
-
-        final firstError =
-            categoriesAsync.error ??
-            matchesAsync.error ??
-            courtsAsync.error ??
-            standingsAsync.error;
-        if (firstError != null) {
-          return _PublicScaffold(
-            tournamentName: tournament.name,
-            child: WorkspaceErrorCard(
-              title: 'Public page needs attention',
-              message: firstError.toString(),
-            ),
-          );
-        }
-
-        if (categoriesAsync.isLoading ||
-            matchesAsync.isLoading ||
-            courtsAsync.isLoading ||
-            standingsAsync.isLoading) {
-          return _PublicScaffold(
-            tournamentName: tournament.name,
-            child: const Center(child: CircularProgressIndicator()),
-          );
-        }
-
         final visibleCategories = _publishedOrAll(
-          categoriesAsync.value ?? const [],
+          categoriesAsync.asData?.value ?? const <CategoryItem>[],
         );
         final normalizedQuery = _query.trim().toLowerCase();
         final matches = _filterMatches(
-          matchesAsync.value ?? const [],
+          matchesAsync.asData?.value ?? const <TournamentMatch>[],
           normalizedQuery,
         );
+        final courts = courtsAsync.asData?.value ?? const <TournamentCourt>[];
         final activeMatches = matches
             .where(
               (match) =>
@@ -191,12 +166,17 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
             children: [
               _HeroCard(
                 tournament: tournament,
-                categoryCount: visibleCategories.length,
-                activeCourtCount: liveCourtCount,
+                categoryCount: categoriesAsync.hasValue
+                    ? visibleCategories.length
+                    : tournament.stats.categories,
+                activeCourtCount: courtsAsync.hasValue
+                    ? liveCourtCount
+                    : tournament.activeCourtCount,
                 activeMatchCount: activeMatches.length,
-                completedMatchCount: (matchesAsync.value ?? const [])
-                    .where((m) => m.isCompleted)
-                    .length,
+                completedMatchCount:
+                    (matchesAsync.asData?.value ?? const <TournamentMatch>[])
+                        .where((m) => m.isCompleted)
+                        .length,
                 highlightMatches: highlightMatches,
               ),
               const SizedBox(height: AppSpace.lg),
@@ -263,10 +243,17 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
                       'Track what is on court now and which matches are getting called next.',
                   accent: AppPalette.sageStrong,
                   icon: Icons.sports_tennis,
-                  child: _CourtBoard(
-                    courts: courtsAsync.value ?? const [],
-                    activeMatches: activeMatches,
-                    query: normalizedQuery,
+                  child: _buildSectionBody<List<TournamentCourt>>(
+                    state: courtsAsync,
+                    loadingTitle: 'Loading live courts',
+                    loadingMessage:
+                        'Pulling court assignments and current floor activity.',
+                    errorTitle: 'Live courts unavailable',
+                    content: (_) => _CourtBoard(
+                      courts: courts,
+                      activeMatches: activeMatches,
+                      query: normalizedQuery,
+                    ),
                   ),
                 ),
               ],
@@ -280,16 +267,30 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
                       'Only approved results appear here after assistant or organizer approval.',
                   leftAccent: AppPalette.apricot,
                   leftIcon: Icons.emoji_events_outlined,
-                  leftChild: _ResultList(matches: recentResults),
+                  leftChild: _buildSectionBody<List<TournamentMatch>>(
+                    state: matchesAsync,
+                    loadingTitle: 'Loading official results',
+                    loadingMessage:
+                        'Checking the latest approved results for this tournament.',
+                    errorTitle: 'Results unavailable',
+                    content: (_) => _ResultList(matches: recentResults),
+                  ),
                   rightTitle: 'Category standings',
                   rightSubtitle:
                       'Qualification lines update from official results as the day moves.',
                   rightAccent: AppPalette.sky,
                   rightIcon: Icons.leaderboard_rounded,
-                  rightChild: _StandingsList(
-                    snapshot: standings,
-                    query: normalizedQuery,
-                    limit: _focusFilter == _PublicFocusFilter.all ? 3 : null,
+                  rightChild: _buildSectionBody<TournamentStandingsSnapshot>(
+                    state: standingsAsync,
+                    loadingTitle: 'Loading standings',
+                    loadingMessage:
+                        'Calculating category tables from official tournament results.',
+                    errorTitle: 'Standings unavailable',
+                    content: (_) => _StandingsList(
+                      snapshot: standings,
+                      query: normalizedQuery,
+                      limit: _focusFilter == _PublicFocusFilter.all ? 3 : null,
+                    ),
                   ),
                 ),
               ],
@@ -302,7 +303,15 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
                       'Browse the divisions in the event and see which formats are in play.',
                   accent: AppPalette.sky,
                   icon: Icons.category_rounded,
-                  child: _CategoryList(categories: visibleCategoriesPreview),
+                  child: _buildSectionBody<List<CategoryItem>>(
+                    state: categoriesAsync,
+                    loadingTitle: 'Loading categories',
+                    loadingMessage:
+                        'Bringing in the published divisions for this tournament.',
+                    errorTitle: 'Categories unavailable',
+                    content: (_) =>
+                        _CategoryList(categories: visibleCategoriesPreview),
+                  ),
                 ),
               ],
             ],
@@ -310,6 +319,25 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
         );
       },
     );
+  }
+
+  Widget _buildSectionBody<T>({
+    required AsyncValue<T> state,
+    required String loadingTitle,
+    required String loadingMessage,
+    required String errorTitle,
+    required Widget Function(T? value) content,
+  }) {
+    if (state.hasError && !state.hasValue) {
+      return WorkspaceErrorCard(
+        title: errorTitle,
+        message: state.error.toString(),
+      );
+    }
+    if (state.isLoading && !state.hasValue) {
+      return _SectionLoadingCard(title: loadingTitle, message: loadingMessage);
+    }
+    return content(state.asData?.value);
   }
 
   Future<void> _signInWithGoogle() async {
@@ -1461,6 +1489,50 @@ final class _SplitPreviewSection extends StatelessWidget {
           ],
         );
       },
+    );
+  }
+}
+
+final class _SectionLoadingCard extends StatelessWidget {
+  const _SectionLoadingCard({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return WorkspaceSurfaceCard(
+      accent: AppPalette.sky,
+      child: Row(
+        children: [
+          const SizedBox(
+            width: 24,
+            height: 24,
+            child: CircularProgressIndicator(strokeWidth: 2.2),
+          ),
+          const SizedBox(width: AppSpace.md),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: AppSpace.xs),
+                Text(
+                  message,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.bodyMedium?.copyWith(color: AppPalette.inkSoft),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
