@@ -4,7 +4,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../theme/app_theme.dart';
 import '../data/tournament_providers.dart';
+import '../data/tournament_role_providers.dart';
 import '../domain/tournament.dart';
+import '../domain/tournament_role.dart';
 import 'workspace_components.dart';
 
 final class OrganizersSection extends ConsumerStatefulWidget {
@@ -25,11 +27,20 @@ final class OrganizersSection extends ConsumerStatefulWidget {
 
 class _OrganizersSectionState extends ConsumerState<OrganizersSection> {
   bool _isAddingOrganizer = false;
+  bool _isAddingAssistant = false;
 
   Future<void> _showAddOrganizerDialog() async {
     final addedEmail = await showDialog<String>(
       context: context,
-      builder: (context) => const _AddOrganizerDialog(),
+      builder: (context) => const _RoleEmailDialog(
+        title: 'Add organizer',
+        description:
+            'Invite another organizer by the Google email they use to sign in.',
+        fieldLabel: 'Organizer email',
+        fieldHint: 'director@example.com',
+        confirmLabel: 'Add organizer',
+        emptyMessage: 'Enter an organizer email.',
+      ),
     );
 
     if (addedEmail == null || !mounted) {
@@ -80,6 +91,84 @@ class _OrganizersSectionState extends ConsumerState<OrganizersSection> {
     }
   }
 
+  Future<void> _showAddAssistantDialog(List<TournamentRole> roles) async {
+    final addedEmail = await showDialog<String>(
+      context: context,
+      builder: (context) => const _RoleEmailDialog(
+        title: 'Add assistant',
+        description:
+            'Assign an assistant by the Google email they use to sign in.',
+        fieldLabel: 'Assistant email',
+        fieldHint: 'assistant@example.com',
+        confirmLabel: 'Add assistant',
+        emptyMessage: 'Enter an assistant email.',
+      ),
+    );
+
+    if (addedEmail == null || !mounted) {
+      return;
+    }
+
+    final normalizedEmail = addedEmail.trim().toLowerCase();
+    final existingAssistant = roles.any(
+      (role) =>
+          role.role == TournamentRoleType.assistant &&
+          role.isActive &&
+          role.email.trim().toLowerCase() == normalizedEmail,
+    );
+    if (existingAssistant) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('$normalizedEmail is already an assistant.')),
+      );
+      return;
+    }
+
+    setState(() {
+      _isAddingAssistant = true;
+    });
+
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      await ref
+          .read(tournamentRoleRepositoryProvider)
+          .addRole(
+            tournamentId: widget.tournament.id,
+            role: TournamentRole(
+              id: normalizedEmail,
+              tournamentId: widget.tournament.id,
+              userId: normalizedEmail,
+              email: normalizedEmail,
+              displayName: normalizedEmail,
+              role: TournamentRoleType.assistant,
+              isActive: true,
+              assignedAt: null,
+              assignedBy: currentUser?.uid ?? '',
+            ),
+          );
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('$normalizedEmail can now open the assistant desk.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(_friendlyOrganizerError(error))));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isAddingAssistant = false;
+        });
+      }
+    }
+  }
+
   Set<String> get _displayOrganizerEmails {
     final emails = widget.tournament.organizerEmails
         .map((email) => email.trim().toLowerCase())
@@ -96,8 +185,19 @@ class _OrganizersSectionState extends ConsumerState<OrganizersSection> {
 
   @override
   Widget build(BuildContext context) {
+    final rolesAsync = ref.watch(tournamentRolesProvider(widget.tournament.id));
     final organizerEmails = _displayOrganizerEmails.toList(growable: false)
       ..sort();
+    final assistantRoles = rolesAsync.maybeWhen(
+      data: (roles) => roles
+          .where(
+            (role) =>
+                role.role == TournamentRoleType.assistant && role.isActive,
+          )
+          .toList(growable: false)
+        ..sort((left, right) => left.email.compareTo(right.email)),
+      orElse: () => const <TournamentRole>[],
+    );
     final currentUserEmail = FirebaseAuth.instance.currentUser?.email
         ?.trim()
         .toLowerCase();
@@ -141,6 +241,63 @@ class _OrganizersSectionState extends ConsumerState<OrganizersSection> {
                   const Divider(height: AppSpace.lg, color: AppPalette.line),
               ],
             ],
+          ),
+        ),
+        const SizedBox(height: AppSpace.lg),
+        WorkspaceSectionLead(
+          title: 'Assistant access',
+          description:
+              'Assign assistant desk access by the Google email they use to sign in.',
+          icon: Icons.assignment_ind,
+          accent: AppPalette.sage,
+          trailing: FilledButton.icon(
+            onPressed: widget.readOnly || _isAddingAssistant
+                ? null
+                : () => _showAddAssistantDialog(assistantRoles),
+            icon: _isAddingAssistant
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.person_add_alt_1_rounded),
+            label: Text(_isAddingAssistant ? 'Adding...' : 'Add assistant'),
+          ),
+        ),
+        const SizedBox(height: AppSpace.md),
+        WorkspaceSurfaceCard(
+          padding: const EdgeInsets.all(AppSpace.md),
+          radius: 16,
+          accent: AppPalette.sage,
+          child: rolesAsync.when(
+            data: (_) => assistantRoles.isEmpty
+                ? const _AccessEmptyState(
+                    title: 'No assistants assigned yet',
+                    message:
+                        'Add an assistant email to let someone open the assistant desk.',
+                  )
+                : Column(
+                    children: [
+                      for (var index = 0; index < assistantRoles.length; index++) ...[
+                        _RoleAccessRow(
+                          email: assistantRoles[index].email,
+                          isCurrentUser:
+                              assistantRoles[index].email == currentUserEmail,
+                          badgeLabel: 'Assistant',
+                        ),
+                        if (index < assistantRoles.length - 1)
+                          const Divider(
+                            height: AppSpace.lg,
+                            color: AppPalette.line,
+                          ),
+                      ],
+                    ],
+                  ),
+            loading: () => const Center(child: CircularProgressIndicator()),
+            error: (error, _) => _AccessEmptyState(
+              title: 'Could not load assistant access',
+              message: _friendlyOrganizerError(error),
+            ),
           ),
         ),
       ],
@@ -222,6 +379,103 @@ final class _OrganizerRow extends StatelessWidget {
   }
 }
 
+final class _RoleAccessRow extends StatelessWidget {
+  const _RoleAccessRow({
+    required this.email,
+    required this.isCurrentUser,
+    required this.badgeLabel,
+  });
+
+  final String email;
+  final bool isCurrentUser;
+  final String badgeLabel;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFDFF1EE), Color(0xFFF4FBFA)],
+            ),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: AppPalette.line),
+          ),
+          child: const Icon(
+            Icons.assignment_ind,
+            size: 18,
+            color: AppPalette.inkSoft,
+          ),
+        ),
+        const SizedBox(width: AppSpace.md),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                email,
+                style: theme.textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Wrap(
+                spacing: AppSpace.xs,
+                runSpacing: AppSpace.xs,
+                children: [
+                  _OrganizerBadge(
+                    label: badgeLabel,
+                    foreground: const Color(0xFF365141),
+                    background: const Color(0xFFE7F4EE),
+                  ),
+                  if (isCurrentUser)
+                    const _OrganizerBadge(
+                      label: 'You',
+                      foreground: Color(0xFF8C6238),
+                      background: Color(0xFFF8EBDD),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+final class _AccessEmptyState extends StatelessWidget {
+  const _AccessEmptyState({required this.title, required this.message});
+
+  final String title;
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(title, style: Theme.of(context).textTheme.titleMedium),
+        const SizedBox(height: AppSpace.xs),
+        Text(
+          message,
+          style: Theme.of(
+            context,
+          ).textTheme.bodyMedium?.copyWith(color: AppPalette.inkSoft),
+        ),
+      ],
+    );
+  }
+}
+
 final class _OrganizerBadge extends StatelessWidget {
   const _OrganizerBadge({
     required this.label,
@@ -253,14 +507,28 @@ final class _OrganizerBadge extends StatelessWidget {
   }
 }
 
-final class _AddOrganizerDialog extends StatefulWidget {
-  const _AddOrganizerDialog();
+final class _RoleEmailDialog extends StatefulWidget {
+  const _RoleEmailDialog({
+    required this.title,
+    required this.description,
+    required this.fieldLabel,
+    required this.fieldHint,
+    required this.confirmLabel,
+    required this.emptyMessage,
+  });
+
+  final String title;
+  final String description;
+  final String fieldLabel;
+  final String fieldHint;
+  final String confirmLabel;
+  final String emptyMessage;
 
   @override
-  State<_AddOrganizerDialog> createState() => _AddOrganizerDialogState();
+  State<_RoleEmailDialog> createState() => _RoleEmailDialogState();
 }
 
-class _AddOrganizerDialogState extends State<_AddOrganizerDialog> {
+class _RoleEmailDialogState extends State<_RoleEmailDialog> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
 
@@ -286,7 +554,7 @@ class _AddOrganizerDialogState extends State<_AddOrganizerDialog> {
         borderRadius: BorderRadius.circular(AppRadii.panel),
         side: const BorderSide(color: AppPalette.line),
       ),
-      title: const Text('Add organizer'),
+      title: Text(widget.title),
       content: SizedBox(
         width: 420,
         child: Form(
@@ -296,7 +564,7 @@ class _AddOrganizerDialogState extends State<_AddOrganizerDialog> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                'Invite another organizer by the Google email they use to sign in.',
+                widget.description,
                 style: Theme.of(
                   context,
                 ).textTheme.bodyMedium?.copyWith(color: AppPalette.inkSoft),
@@ -306,14 +574,14 @@ class _AddOrganizerDialogState extends State<_AddOrganizerDialog> {
                 controller: _emailController,
                 keyboardType: TextInputType.emailAddress,
                 autofillHints: const [AutofillHints.email],
-                decoration: const InputDecoration(
-                  labelText: 'Organizer email',
-                  hintText: 'director@example.com',
+                decoration: InputDecoration(
+                  labelText: widget.fieldLabel,
+                  hintText: widget.fieldHint,
                 ),
                 validator: (value) {
                   final email = value?.trim() ?? '';
                   if (email.isEmpty) {
-                    return 'Enter an organizer email.';
+                    return widget.emptyMessage;
                   }
                   final emailPattern = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$');
                   if (!emailPattern.hasMatch(email)) {
@@ -332,7 +600,7 @@ class _AddOrganizerDialogState extends State<_AddOrganizerDialog> {
           onPressed: () => Navigator.of(context).pop(),
           child: const Text('Cancel'),
         ),
-        FilledButton(onPressed: _submit, child: const Text('Add organizer')),
+        FilledButton(onPressed: _submit, child: Text(widget.confirmLabel)),
       ],
     );
   }

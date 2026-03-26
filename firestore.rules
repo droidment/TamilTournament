@@ -47,17 +47,39 @@ service cloud.firestore {
       return get(/databases/$(database)/documents/tournaments/$(tournamentId)/roles/$(request.auth.uid));
     }
 
+    function hasTournamentRoleByEmail(tournamentId, role) {
+      return signedIn()
+        && organizerEmail() != ''
+        && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/roles/$(organizerEmail()))
+        && get(/databases/$(database)/documents/tournaments/$(tournamentId)/roles/$(organizerEmail())).data.role == role
+        && get(/databases/$(database)/documents/tournaments/$(tournamentId)/roles/$(organizerEmail())).data.isActive == true;
+    }
+
     function hasTournamentRole(tournamentId, role) {
       return signedIn()
-        && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/roles/$(request.auth.uid))
-        && getTournamentRole(tournamentId).data.role == role
-        && getTournamentRole(tournamentId).data.isActive == true;
+        && (
+          (
+            exists(/databases/$(database)/documents/tournaments/$(tournamentId)/roles/$(request.auth.uid))
+            && getTournamentRole(tournamentId).data.role == role
+            && getTournamentRole(tournamentId).data.isActive == true
+          )
+          || hasTournamentRoleByEmail(tournamentId, role)
+        );
     }
 
     function hasAnyTournamentRole(tournamentId) {
       return signedIn()
-        && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/roles/$(request.auth.uid))
-        && getTournamentRole(tournamentId).data.isActive == true;
+        && (
+          (
+            exists(/databases/$(database)/documents/tournaments/$(tournamentId)/roles/$(request.auth.uid))
+            && getTournamentRole(tournamentId).data.isActive == true
+          )
+          || (
+            organizerEmail() != ''
+            && exists(/databases/$(database)/documents/tournaments/$(tournamentId)/roles/$(organizerEmail()))
+            && get(/databases/$(database)/documents/tournaments/$(tournamentId)/roles/$(organizerEmail())).data.isActive == true
+          )
+        );
     }
 
     function isTournamentAssistant(tournamentId) {

@@ -32,13 +32,31 @@ final class TournamentRoleRepository {
   Future<TournamentRole?> findRoleForUser({
     required String tournamentId,
     required String userId,
+    required String? email,
   }) async {
-    final doc = await _rolesRef(tournamentId).doc(userId).get();
-    if (!doc.exists) {
+    final userDoc = await _rolesRef(tournamentId).doc(userId).get();
+    if (userDoc.exists) {
+      final role = TournamentRole.fromDocument(
+        userDoc,
+        tournamentId: tournamentId,
+      );
+      if (role.isActive) {
+        return role;
+      }
+    }
+
+    final normalizedEmail = email?.trim().toLowerCase() ?? '';
+    if (normalizedEmail.isEmpty) {
       return null;
     }
+
+    final emailDoc = await _rolesRef(tournamentId).doc(normalizedEmail).get();
+    if (!emailDoc.exists) {
+      return null;
+    }
+
     final role = TournamentRole.fromDocument(
-      doc,
+      emailDoc,
       tournamentId: tournamentId,
     );
     return role.isActive ? role : null;

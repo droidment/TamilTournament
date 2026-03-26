@@ -53,5 +53,9 @@ final currentUserRoleProvider = FutureProvider.family<TournamentRole?, String>((
   }
   return ref
       .watch(tournamentRoleRepositoryProvider)
-      .findRoleForUser(tournamentId: tournamentId, userId: user.uid);
+      .findRoleForUser(
+        tournamentId: tournamentId,
+        userId: user.uid,
+        email: user.email,
+      );
 });
