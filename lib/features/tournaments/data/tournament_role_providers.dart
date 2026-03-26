@@ -1,6 +1,8 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../auth/data/auth_providers.dart';
+import '../domain/tournament.dart';
 import '../domain/tournament_role.dart';
 import 'tournament_providers.dart';
 import 'tournament_role_repository.dart';
@@ -26,9 +28,16 @@ final currentUserRoleProvider = FutureProvider.family<TournamentRole?, String>((
   if (user == null) {
     return null;
   }
-  final ownedTournament = await ref.watch(
-    tournamentByIdProvider(tournamentId).future,
-  );
+  Tournament? ownedTournament;
+  try {
+    ownedTournament = await ref.watch(
+      tournamentByIdProvider(tournamentId).future,
+    );
+  } on FirebaseException catch (error) {
+    if (error.code != 'permission-denied') {
+      rethrow;
+    }
+  }
   if (ownedTournament != null) {
     return TournamentRole(
       id: user.uid,

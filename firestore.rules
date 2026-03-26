@@ -95,6 +95,7 @@ service cloud.firestore {
         && organizerEmail() in request.resource.data.organizerEmails
         && validTournamentStatus();
       allow read: if hasTournamentAccess(resource.data)
+        || isTournamentStaff(tournamentId)
         || resource.data.isPublic == true;
       allow update: if hasTournamentAccess(resource.data)
         && request.resource.data.organizerUid == resource.data.organizerUid
