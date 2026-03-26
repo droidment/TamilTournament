@@ -34,11 +34,25 @@ final class WorkspaceStatRail extends StatelessWidget {
             return Container(
               padding: const EdgeInsets.all(AppSpace.xs),
               decoration: BoxDecoration(
-                color: AppPalette.surface,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppPalette.surface,
+                    AppPalette.surfaceSoft.withValues(alpha: 0.78),
+                  ],
+                ),
                 borderRadius: BorderRadius.circular(AppRadii.panel),
                 border: Border.all(
-                  color: AppPalette.line.withValues(alpha: 0.9),
+                  color: AppPalette.lineStrong.withValues(alpha: 0.88),
                 ),
+                boxShadow: const [
+                  BoxShadow(
+                    color: Color(0x100E1914),
+                    blurRadius: 18,
+                    offset: Offset(0, 8),
+                  ),
+                ],
               ),
               child: Row(
                 children: [
@@ -74,9 +88,25 @@ final class WorkspaceStatRail extends StatelessWidget {
         return Container(
           padding: const EdgeInsets.all(AppSpace.xs),
           decoration: BoxDecoration(
-            color: AppPalette.surface,
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppPalette.surface,
+                AppPalette.surfaceSoft.withValues(alpha: 0.78),
+              ],
+            ),
             borderRadius: BorderRadius.circular(AppRadii.panel),
-            border: Border.all(color: AppPalette.line.withValues(alpha: 0.9)),
+            border: Border.all(
+              color: AppPalette.lineStrong.withValues(alpha: 0.88),
+            ),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x100E1914),
+                blurRadius: 18,
+                offset: Offset(0, 8),
+              ),
+            ],
           ),
           child: Row(
             children: [
@@ -317,15 +347,36 @@ final class WorkspaceSectionLead extends StatelessWidget {
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
               colors: [
-                resolvedAccent.withValues(alpha: 0.14),
-                Colors.white.withValues(alpha: 0.72),
+                resolvedAccent.withValues(alpha: 0.22),
+                resolvedAccent.withValues(alpha: 0.08),
+                Colors.white.withValues(alpha: 0.88),
               ],
+              stops: const [0.0, 0.36, 1.0],
             ),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: resolvedAccent.withValues(alpha: 0.24)),
+            border: Border.all(color: resolvedAccent.withValues(alpha: 0.3)),
+            boxShadow: [
+              BoxShadow(
+                color: resolvedAccent.withValues(alpha: 0.08),
+                blurRadius: 22,
+                offset: const Offset(0, 12),
+              ),
+            ],
           ),
           child: Stack(
             children: [
+              Positioned(
+                right: constraints.maxWidth < 620 ? -28 : -18,
+                bottom: constraints.maxWidth < 620 ? -26 : -20,
+                child: Container(
+                  width: constraints.maxWidth < 620 ? 88 : 108,
+                  height: constraints.maxWidth < 620 ? 88 : 108,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: resolvedAccent.withValues(alpha: 0.12),
+                  ),
+                ),
+              ),
               Positioned(
                 right: constraints.maxWidth < 620 ? -8 : 4,
                 top: constraints.maxWidth < 620 ? -8 : -2,
@@ -375,20 +426,36 @@ final class WorkspaceSurfaceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final accentWash = accent?.withValues(alpha: 0.08);
+    final borderColor = accent?.withValues(alpha: 0.22) ?? AppPalette.line;
+
     return Container(
       decoration: BoxDecoration(
-        color: AppPalette.surface,
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [accentWash ?? AppPalette.surface, AppPalette.surface],
+        ),
         borderRadius: BorderRadius.circular(radius),
-        border: Border.all(color: AppPalette.line),
+        border: Border.all(color: borderColor),
+        boxShadow: [
+          BoxShadow(
+            color: (accent ?? AppPalette.ink).withValues(alpha: 0.05),
+            blurRadius: 18,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (accent != null)
             Container(
-              height: 4,
+              height: 5,
               decoration: BoxDecoration(
-                color: accent,
+                gradient: LinearGradient(
+                  colors: [accent!, accent!.withValues(alpha: 0.72)],
+                ),
                 borderRadius: BorderRadius.vertical(
                   top: Radius.circular(radius),
                 ),
