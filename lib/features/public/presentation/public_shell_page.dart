@@ -261,13 +261,13 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
                   _focusFilter == _PublicFocusFilter.results ||
                   _focusFilter == _PublicFocusFilter.standings) ...[
                 const SizedBox(height: AppSpace.xl),
-                _SplitPreviewSection(
-                  leftTitle: 'Recent official results',
-                  leftSubtitle:
+                _Section(
+                  title: 'Recent official results',
+                  subtitle:
                       'Only approved results appear here after assistant or organizer approval.',
-                  leftAccent: AppPalette.apricot,
-                  leftIcon: Icons.emoji_events_outlined,
-                  leftChild: _buildSectionBody<List<TournamentMatch>>(
+                  accent: AppPalette.apricot,
+                  icon: Icons.emoji_events_outlined,
+                  child: _buildSectionBody<List<TournamentMatch>>(
                     state: matchesAsync,
                     loadingTitle: 'Loading official results',
                     loadingMessage:
@@ -275,24 +275,32 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
                     errorTitle: 'Results unavailable',
                     content: (_) => _ResultList(matches: recentResults),
                   ),
-                  rightTitle: 'Category standings',
-                  rightSubtitle:
-                      'Qualification lines update from official results as the day moves.',
-                  rightAccent: AppPalette.sky,
-                  rightIcon: Icons.leaderboard_rounded,
-                  rightChild: _buildSectionBody<TournamentStandingsSnapshot>(
-                    state: standingsAsync,
-                    loadingTitle: 'Loading standings',
-                    loadingMessage:
-                        'Calculating category tables from official tournament results.',
-                    errorTitle: 'Standings unavailable',
-                    content: (_) => _StandingsList(
-                      snapshot: standings,
-                      query: normalizedQuery,
-                      limit: _focusFilter == _PublicFocusFilter.all ? 3 : null,
+                ),
+                if (_focusFilter == _PublicFocusFilter.all ||
+                    _focusFilter == _PublicFocusFilter.standings) ...[
+                  const SizedBox(height: AppSpace.xl),
+                  _Section(
+                    title: 'Category standings',
+                    subtitle:
+                        'Qualification lines update from official results as the day moves.',
+                    accent: AppPalette.sky,
+                    icon: Icons.leaderboard_rounded,
+                    child: _buildSectionBody<TournamentStandingsSnapshot>(
+                      state: standingsAsync,
+                      loadingTitle: 'Loading standings',
+                      loadingMessage:
+                          'Calculating category tables from official tournament results.',
+                      errorTitle: 'Standings unavailable',
+                      content: (_) => _StandingsList(
+                        snapshot: standings,
+                        query: normalizedQuery,
+                        limit: _focusFilter == _PublicFocusFilter.all
+                            ? 3
+                            : null,
+                      ),
                     ),
                   ),
-                ),
+                ],
               ],
               if (_focusFilter == _PublicFocusFilter.all ||
                   _focusFilter == _PublicFocusFilter.categories) ...[
@@ -956,10 +964,12 @@ final class _CourtBoard extends StatelessWidget {
                   if (matchByCourtId[court.id] != null) ...[
                     const SizedBox(height: AppSpace.xs),
                     Text(
-                      '${matchByCourtId[court.id]!.teamOneLabel} vs ${matchByCourtId[court.id]!.teamTwoLabel}',
+                      '${_publicTeamLabel(matchByCourtId[court.id]!.teamOneLabel, matchByCourtId[court.id]!.teamOneDetail)} vs ${_publicTeamLabel(matchByCourtId[court.id]!.teamTwoLabel, matchByCourtId[court.id]!.teamTwoDetail)}',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                         color: AppPalette.inkSoft,
                       ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                     ),
                     const SizedBox(height: AppSpace.sm),
                     Wrap(
@@ -1029,8 +1039,12 @@ final class _ResultList extends StatelessWidget {
                 ),
                 const SizedBox(height: AppSpace.xs),
                 Text(
-                  '${matches[index].teamOneLabel} vs ${matches[index].teamTwoLabel}',
-                  style: Theme.of(context).textTheme.titleMedium,
+                  '${_publicTeamLabel(matches[index].teamOneLabel, matches[index].teamOneDetail)} vs ${_publicTeamLabel(matches[index].teamTwoLabel, matches[index].teamTwoDetail)}',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
                 const SizedBox(height: AppSpace.sm),
                 Wrap(
@@ -1038,7 +1052,7 @@ final class _ResultList extends StatelessWidget {
                   runSpacing: AppSpace.xs,
                   children: [
                     WorkspaceTag(
-                      label: matches[index].winnerLabel ?? 'Winner decided',
+                      label: _winnerPublicLabel(matches[index]),
                       background: AppPalette.oliveSoft,
                       foreground: const Color(0xFF5F7243),
                     ),
@@ -1399,10 +1413,12 @@ final class _LiveHighlightRow extends StatelessWidget {
               ),
               const SizedBox(height: AppSpace.xs),
               Text(
-                '${match.teamOneLabel} vs ${match.teamTwoLabel}',
+                '${_publicTeamLabel(match.teamOneLabel, match.teamOneDetail)} vs ${_publicTeamLabel(match.teamTwoLabel, match.teamTwoDetail)}',
                 style: Theme.of(
                   context,
                 ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w700),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: AppSpace.xs),
               Text(
@@ -1421,74 +1437,6 @@ final class _LiveHighlightRow extends StatelessWidget {
           foreground: _matchAccent(match),
         ),
       ],
-    );
-  }
-}
-
-final class _SplitPreviewSection extends StatelessWidget {
-  const _SplitPreviewSection({
-    required this.leftTitle,
-    required this.leftSubtitle,
-    required this.leftAccent,
-    required this.leftIcon,
-    required this.leftChild,
-    required this.rightTitle,
-    required this.rightSubtitle,
-    required this.rightAccent,
-    required this.rightIcon,
-    required this.rightChild,
-  });
-
-  final String leftTitle;
-  final String leftSubtitle;
-  final Color leftAccent;
-  final IconData leftIcon;
-  final Widget leftChild;
-  final String rightTitle;
-  final String rightSubtitle;
-  final Color rightAccent;
-  final IconData rightIcon;
-  final Widget rightChild;
-
-  @override
-  Widget build(BuildContext context) {
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        final left = _Section(
-          title: leftTitle,
-          subtitle: leftSubtitle,
-          accent: leftAccent,
-          icon: leftIcon,
-          child: leftChild,
-        );
-        final right = _Section(
-          title: rightTitle,
-          subtitle: rightSubtitle,
-          accent: rightAccent,
-          icon: rightIcon,
-          child: rightChild,
-        );
-
-        if (constraints.maxWidth < 980) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              left,
-              const SizedBox(height: AppSpace.xl),
-              right,
-            ],
-          );
-        }
-
-        return Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Expanded(child: left),
-            const SizedBox(width: AppSpace.lg),
-            Expanded(child: right),
-          ],
-        );
-      },
     );
   }
 }
@@ -1655,6 +1603,58 @@ Color _courtTagForeground(TournamentMatch? match, TournamentCourt court) {
     return _matchAccent(match);
   }
   return court.isAvailable ? const Color(0xFF456F77) : AppPalette.inkSoft;
+}
+
+String _winnerPublicLabel(TournamentMatch match) {
+  if (match.winnerEntryId != null &&
+      match.winnerEntryId == match.teamOneEntryId) {
+    return _publicTeamLabel(match.teamOneLabel, match.teamOneDetail);
+  }
+  if (match.winnerEntryId != null &&
+      match.winnerEntryId == match.teamTwoEntryId) {
+    return _publicTeamLabel(match.teamTwoLabel, match.teamTwoDetail);
+  }
+  if (match.winnerLabel?.trim().isNotEmpty ?? false) {
+    return _publicTeamLabel(match.winnerLabel!.trim(), '');
+  }
+  return 'Winner decided';
+}
+
+String _publicTeamLabel(String primaryLabel, String detailLabel) {
+  final normalizedPrimary = primaryLabel.trim();
+  final normalizedDetail = detailLabel.trim();
+  final rosterSource = normalizedDetail.contains('·')
+      ? normalizedDetail.split('·').last.trim()
+      : normalizedDetail;
+  final participants = rosterSource
+      .split('/')
+      .map((part) => _shortPersonName(part))
+      .where((part) => part.isNotEmpty)
+      .toList(growable: false);
+  if (participants.isNotEmpty) {
+    return participants.join(' / ');
+  }
+  return _shortPersonName(normalizedPrimary);
+}
+
+String _shortPersonName(String value) {
+  final cleaned = value.trim();
+  if (cleaned.isEmpty) {
+    return '';
+  }
+  final words = cleaned
+      .split(RegExp(r'\s+'))
+      .where((part) => part.isNotEmpty)
+      .toList(growable: false);
+  if (words.isEmpty) {
+    return '';
+  }
+  if (words.length == 1) {
+    return words.first;
+  }
+  final first = words.first;
+  final lastInitial = words.last.substring(0, 1).toUpperCase();
+  return '$first $lastInitial.';
 }
 
 String _friendlyAuthError(FirebaseAuthException error) {
