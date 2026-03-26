@@ -53,9 +53,16 @@ final class PublicShellPage extends ConsumerStatefulWidget {
 class _PublicShellPageState extends ConsumerState<PublicShellPage> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
-  _PublicFocusFilter _focusFilter = _PublicFocusFilter.all;
+  _PublicFocusFilter _focusFilter = _PublicFocusFilter.live;
   bool _isSigningIn = false;
   bool _isVolunteering = false;
+
+  static const _mobileTabs = <_PublicFocusFilter>[
+    _PublicFocusFilter.live,
+    _PublicFocusFilter.results,
+    _PublicFocusFilter.standings,
+    _PublicFocusFilter.categories,
+  ];
 
   @override
   void dispose() {
@@ -80,6 +87,8 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
         ),
       ),
       data: (tournament) {
+        final screenWidth = MediaQuery.sizeOf(context).width;
+        final isCompact = screenWidth < 760;
         if (tournament == null) {
           return const _PublicScaffold(
             child: WorkspaceErrorCard(
@@ -153,15 +162,29 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
         final visibleCategoriesPreview = filteredCategories
             .take(6)
             .toList(growable: false);
+        final activeFilter = isCompact && _focusFilter == _PublicFocusFilter.all
+            ? _PublicFocusFilter.live
+            : _focusFilter;
 
         return _PublicScaffold(
           tournamentName: tournament.name,
+          bottomNavigationBar: isCompact
+              ? _PublicBottomNavigation(
+                  currentFilter: activeFilter,
+                  tabs: _mobileTabs,
+                  onSelect: (filter) {
+                    setState(() {
+                      _focusFilter = filter;
+                    });
+                  },
+                )
+              : null,
           child: ListView(
-            padding: const EdgeInsets.fromLTRB(
+            padding: EdgeInsets.fromLTRB(
               AppSpace.lg,
               AppSpace.lg,
               AppSpace.lg,
-              AppSpace.xxl,
+              isCompact ? 96 : AppSpace.xxl,
             ),
             children: [
               _HeroCard(
@@ -183,7 +206,8 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
               _SearchHubCard(
                 controller: _searchController,
                 query: normalizedQuery,
-                focusFilter: _focusFilter,
+                focusFilter: activeFilter,
+                showsFilters: !isCompact,
                 onChanged: (value) => setState(() => _query = value),
                 onSelectFilter: (filter) {
                   setState(() {
@@ -196,7 +220,9 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
                         _searchController.clear();
                         setState(() {
                           _query = '';
-                          _focusFilter = _PublicFocusFilter.all;
+                          _focusFilter = isCompact
+                              ? _PublicFocusFilter.live
+                              : _PublicFocusFilter.all;
                         });
                       },
                 stats: [
@@ -234,8 +260,8 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
                     ? null
                     : () => _volunteerAsReferee(tournament.id, user),
               ),
-              if (_focusFilter == _PublicFocusFilter.all ||
-                  _focusFilter == _PublicFocusFilter.live) ...[
+              if (activeFilter == _PublicFocusFilter.all ||
+                  activeFilter == _PublicFocusFilter.live) ...[
                 const SizedBox(height: AppSpace.xl),
                 _Section(
                   title: 'Live courts',
@@ -257,9 +283,9 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
                   ),
                 ),
               ],
-              if (_focusFilter == _PublicFocusFilter.all ||
-                  _focusFilter == _PublicFocusFilter.results ||
-                  _focusFilter == _PublicFocusFilter.standings) ...[
+              if (activeFilter == _PublicFocusFilter.all ||
+                  activeFilter == _PublicFocusFilter.results ||
+                  activeFilter == _PublicFocusFilter.standings) ...[
                 const SizedBox(height: AppSpace.xl),
                 _Section(
                   title: 'Recent official results',
@@ -276,8 +302,8 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
                     content: (_) => _ResultList(matches: recentResults),
                   ),
                 ),
-                if (_focusFilter == _PublicFocusFilter.all ||
-                    _focusFilter == _PublicFocusFilter.standings) ...[
+                if (activeFilter == _PublicFocusFilter.all ||
+                    activeFilter == _PublicFocusFilter.standings) ...[
                   const SizedBox(height: AppSpace.xl),
                   _Section(
                     title: 'Category standings',
@@ -294,7 +320,7 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
                       content: (_) => _StandingsList(
                         snapshot: standings,
                         query: normalizedQuery,
-                        limit: _focusFilter == _PublicFocusFilter.all
+                        limit: activeFilter == _PublicFocusFilter.all
                             ? 3
                             : null,
                       ),
@@ -302,8 +328,8 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
                   ),
                 ],
               ],
-              if (_focusFilter == _PublicFocusFilter.all ||
-                  _focusFilter == _PublicFocusFilter.categories) ...[
+              if (activeFilter == _PublicFocusFilter.all ||
+                  activeFilter == _PublicFocusFilter.categories) ...[
                 const SizedBox(height: AppSpace.xl),
                 _Section(
                   title: 'Categories',
@@ -411,10 +437,15 @@ class _PublicShellPageState extends ConsumerState<PublicShellPage> {
 }
 
 final class _PublicScaffold extends StatelessWidget {
-  const _PublicScaffold({required this.child, this.tournamentName});
+  const _PublicScaffold({
+    required this.child,
+    this.tournamentName,
+    this.bottomNavigationBar,
+  });
 
   final Widget child;
   final String? tournamentName;
+  final Widget? bottomNavigationBar;
 
   @override
   Widget build(BuildContext context) {
@@ -448,6 +479,7 @@ final class _PublicScaffold extends StatelessWidget {
             ),
         ],
       ),
+      bottomNavigationBar: bottomNavigationBar,
       body: SafeArea(child: child),
     );
   }
@@ -903,107 +935,119 @@ final class _CourtBoard extends StatelessWidget {
       return left.orderIndex.compareTo(right.orderIndex);
     });
 
-    return Wrap(
-      spacing: AppSpace.md,
-      runSpacing: AppSpace.md,
-      children: [
-        for (final court in filteredCourts)
-          SizedBox(
-            width: 270,
-            child: WorkspaceSurfaceCard(
-              accent: _courtAccent(matchByCourtId[court.id], court),
-              padding: const EdgeInsets.all(AppSpace.md),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        final cardWidth = switch (availableWidth) {
+          < 720 => availableWidth,
+          < 1120 => (availableWidth - AppSpace.md) / 2,
+          _ => (availableWidth - (AppSpace.md * 2)) / 3,
+        };
+
+        return Wrap(
+          spacing: AppSpace.md,
+          runSpacing: AppSpace.md,
+          children: [
+            for (final court in filteredCourts)
+              SizedBox(
+                width: cardWidth,
+                child: WorkspaceSurfaceCard(
+                  accent: _courtAccent(matchByCourtId[court.id], court),
+                  padding: const EdgeInsets.all(AppSpace.md),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: Text(
-                          court.code,
-                          style: Theme.of(context).textTheme.titleLarge,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              court.code,
+                              style: Theme.of(context).textTheme.titleLarge,
+                            ),
+                          ),
+                          WorkspaceTag(
+                            label: _courtStatusLabel(
+                              matchByCourtId[court.id],
+                              court,
+                            ),
+                            background: _courtTagBackground(
+                              matchByCourtId[court.id],
+                              court,
+                            ),
+                            foreground: _courtTagForeground(
+                              matchByCourtId[court.id],
+                              court,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: AppSpace.sm),
+                      Text(
+                        court.name,
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: AppPalette.inkSoft,
                         ),
                       ),
-                      WorkspaceTag(
-                        label: _courtStatusLabel(
-                          matchByCourtId[court.id],
-                          court,
-                        ),
-                        background: _courtTagBackground(
-                          matchByCourtId[court.id],
-                          court,
-                        ),
-                        foreground: _courtTagForeground(
-                          matchByCourtId[court.id],
-                          court,
+                      const SizedBox(height: AppSpace.md),
+                      Text(
+                        matchByCourtId[court.id] == null
+                            ? (court.isAvailable
+                                  ? 'Open court'
+                                  : 'Court unavailable')
+                            : matchByCourtId[court.id]!.categoryName,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          color: matchByCourtId[court.id] == null
+                              ? AppPalette.inkSoft
+                              : AppPalette.ink,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
+                      if (matchByCourtId[court.id] != null) ...[
+                        const SizedBox(height: AppSpace.xs),
+                        Text(
+                          '${_publicTeamLabel(matchByCourtId[court.id]!.teamOneLabel, matchByCourtId[court.id]!.teamOneDetail)} vs ${_publicTeamLabel(matchByCourtId[court.id]!.teamTwoLabel, matchByCourtId[court.id]!.teamTwoDetail)}',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(color: AppPalette.inkSoft),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: AppSpace.sm),
+                        Wrap(
+                          spacing: AppSpace.xs,
+                          runSpacing: AppSpace.xs,
+                          children: [
+                            WorkspaceTag(
+                              label: matchByCourtId[court.id]!.matchCode,
+                              background: AppPalette.surfaceSoft,
+                              foreground: AppPalette.inkSoft,
+                            ),
+                            if (matchByCourtId[court.id]!.assignedCourtName !=
+                                null)
+                              WorkspaceTag(
+                                label: matchByCourtId[court.id]!
+                                    .assignedCourtName!,
+                                background: AppPalette.skySoft,
+                                foreground: const Color(0xFF456F77),
+                              ),
+                          ],
+                        ),
+                      ],
+                      if (matchByCourtId[court.id]?.hasScores ?? false) ...[
+                        const SizedBox(height: AppSpace.xs),
+                        Text(
+                          matchByCourtId[court.id]!.scoreSummary,
+                          style: AppTheme.numeric(
+                            Theme.of(context).textTheme.bodySmall,
+                          ).copyWith(color: AppPalette.inkSoft),
+                        ),
+                      ],
                     ],
                   ),
-                  const SizedBox(height: AppSpace.sm),
-                  Text(
-                    court.name,
-                    style: Theme.of(
-                      context,
-                    ).textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
-                  ),
-                  const SizedBox(height: AppSpace.md),
-                  Text(
-                    matchByCourtId[court.id] == null
-                        ? (court.isAvailable
-                              ? 'Open court'
-                              : 'Court unavailable')
-                        : matchByCourtId[court.id]!.categoryName,
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: matchByCourtId[court.id] == null
-                          ? AppPalette.inkSoft
-                          : AppPalette.ink,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  if (matchByCourtId[court.id] != null) ...[
-                    const SizedBox(height: AppSpace.xs),
-                    Text(
-                      '${_publicTeamLabel(matchByCourtId[court.id]!.teamOneLabel, matchByCourtId[court.id]!.teamOneDetail)} vs ${_publicTeamLabel(matchByCourtId[court.id]!.teamTwoLabel, matchByCourtId[court.id]!.teamTwoDetail)}',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: AppPalette.inkSoft,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: AppSpace.sm),
-                    Wrap(
-                      spacing: AppSpace.xs,
-                      runSpacing: AppSpace.xs,
-                      children: [
-                        WorkspaceTag(
-                          label: matchByCourtId[court.id]!.matchCode,
-                          background: AppPalette.surfaceSoft,
-                          foreground: AppPalette.inkSoft,
-                        ),
-                        if (matchByCourtId[court.id]!.assignedCourtName != null)
-                          WorkspaceTag(
-                            label: matchByCourtId[court.id]!.assignedCourtName!,
-                            background: AppPalette.skySoft,
-                            foreground: const Color(0xFF456F77),
-                          ),
-                      ],
-                    ),
-                  ],
-                  if (matchByCourtId[court.id]?.hasScores ?? false) ...[
-                    const SizedBox(height: AppSpace.xs),
-                    Text(
-                      matchByCourtId[court.id]!.scoreSummary,
-                      style: AppTheme.numeric(
-                        Theme.of(context).textTheme.bodySmall,
-                      ).copyWith(color: AppPalette.inkSoft),
-                    ),
-                  ],
-                ],
+                ),
               ),
-            ),
-          ),
-      ],
+          ],
+        );
+      },
     );
   }
 }
@@ -1225,6 +1269,7 @@ final class _SearchHubCard extends StatelessWidget {
     required this.controller,
     required this.query,
     required this.focusFilter,
+    required this.showsFilters,
     required this.onChanged,
     required this.onSelectFilter,
     required this.onClear,
@@ -1234,6 +1279,7 @@ final class _SearchHubCard extends StatelessWidget {
   final TextEditingController controller;
   final String query;
   final _PublicFocusFilter focusFilter;
+  final bool showsFilters;
   final ValueChanged<String> onChanged;
   final ValueChanged<_PublicFocusFilter> onSelectFilter;
   final VoidCallback? onClear;
@@ -1276,23 +1322,25 @@ final class _SearchHubCard extends StatelessWidget {
                     ),
             ),
           ),
-          const SizedBox(height: AppSpace.md),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: [
-                for (final filter in _PublicFocusFilter.values) ...[
-                  _FilterChip(
-                    filter: filter,
-                    isSelected: focusFilter == filter,
-                    onTap: () => onSelectFilter(filter),
-                  ),
-                  if (filter != _PublicFocusFilter.values.last)
-                    const SizedBox(width: AppSpace.sm),
+          if (showsFilters) ...[
+            const SizedBox(height: AppSpace.md),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: [
+                  for (final filter in _PublicFocusFilter.values) ...[
+                    _FilterChip(
+                      filter: filter,
+                      isSelected: focusFilter == filter,
+                      onTap: () => onSelectFilter(filter),
+                    ),
+                    if (filter != _PublicFocusFilter.values.last)
+                      const SizedBox(width: AppSpace.sm),
+                  ],
                 ],
-              ],
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: AppSpace.md),
           WorkspaceStatRail(metrics: stats),
           if (query.isNotEmpty) ...[
@@ -1367,6 +1415,71 @@ final class _FilterChip extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                 ),
               ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+final class _PublicBottomNavigation extends StatelessWidget {
+  const _PublicBottomNavigation({
+    required this.currentFilter,
+    required this.tabs,
+    required this.onSelect,
+  });
+
+  final _PublicFocusFilter currentFilter;
+  final List<_PublicFocusFilter> tabs;
+  final ValueChanged<_PublicFocusFilter> onSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    final currentIndex = tabs.indexOf(currentFilter);
+    final selectedIndex = currentIndex < 0 ? 0 : currentIndex;
+
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(
+          AppSpace.md,
+          AppSpace.xs,
+          AppSpace.md,
+          AppSpace.md,
+        ),
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xFFF5FAF8), Color(0xFFFFFBF5)],
+            ),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: AppPalette.lineStrong),
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x140B1612),
+                blurRadius: 18,
+                offset: Offset(0, 8),
+              ),
+            ],
+          ),
+          child: NavigationBar(
+            selectedIndex: selectedIndex,
+            backgroundColor: Colors.transparent,
+            surfaceTintColor: Colors.transparent,
+            indicatorColor: AppPalette.sageSoft,
+            height: 72,
+            labelBehavior: NavigationDestinationLabelBehavior.alwaysShow,
+            onDestinationSelected: (index) => onSelect(tabs[index]),
+            destinations: [
+              for (final tab in tabs)
+                NavigationDestination(
+                  icon: Icon(tab.icon),
+                  selectedIcon: Icon(tab.icon, color: AppPalette.sageStrong),
+                  label: tab.label,
+                ),
             ],
           ),
         ),
