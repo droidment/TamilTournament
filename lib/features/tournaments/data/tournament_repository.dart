@@ -135,9 +135,18 @@ final class TournamentRepository {
   }
 
   Future<Tournament?> loadPublicTournamentByCode({required String code}) async {
+    final rawCode = code.trim();
     final normalizedCode = _normalizePublicCode(code);
-    if (normalizedCode.isEmpty) {
+    if (rawCode.isEmpty || normalizedCode.isEmpty) {
       return null;
+    }
+
+    final directSnapshot = await _tournaments.doc(rawCode).get();
+    if (directSnapshot.exists) {
+      final tournament = Tournament.fromDocument(directSnapshot);
+      if (tournament.isPublic) {
+        return tournament;
+      }
     }
 
     final slugSnapshot = await _tournaments
@@ -148,14 +157,7 @@ final class TournamentRepository {
     if (slugSnapshot.docs.isNotEmpty) {
       return Tournament.fromDocument(slugSnapshot.docs.first);
     }
-
-    final directSnapshot = await _tournaments.doc(normalizedCode).get();
-    if (!directSnapshot.exists) {
-      return null;
-    }
-
-    final tournament = Tournament.fromDocument(directSnapshot);
-    return tournament.isPublic ? tournament : null;
+    return null;
   }
 
   Future<List<Tournament>> loadPublicTournaments() async {
