@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../theme/app_theme.dart';
 import '../../auth/data/auth_providers.dart';
@@ -10,6 +11,7 @@ import '../../scheduler/data/tournament_match_providers.dart';
 import '../../scheduler/domain/score_submission.dart';
 import '../../scheduler/domain/tournament_match.dart';
 import '../../tournaments/data/tournament_role_providers.dart';
+import '../../tournaments/data/tournament_providers.dart';
 import '../../tournaments/domain/tournament_role.dart';
 
 final class RefereeShellPage extends ConsumerStatefulWidget {
@@ -39,11 +41,15 @@ class _RefereeShellPageState extends ConsumerState<RefereeShellPage> {
     final matchesAsync = ref.watch(
       tournamentMatchesProvider(widget.tournamentId),
     );
+    final tournamentAsync = ref.watch(tournamentByIdProvider(widget.tournamentId));
+    final tournamentName =
+        tournamentAsync.asData?.value?.name ?? widget.tournamentId;
     final error = roleAsync.error ?? matchesAsync.error;
 
     if (error != null) {
       return _RefereeScaffold(
         roleLabel: 'Referee',
+        tournamentName: tournamentName,
         child: _RefereeEmptyState(
           title: 'Unable to load referee workspace',
           message: error.toString(),
@@ -55,6 +61,7 @@ class _RefereeShellPageState extends ConsumerState<RefereeShellPage> {
     if (roleAsync.isLoading || matchesAsync.isLoading) {
       return const _RefereeScaffold(
         roleLabel: 'Referee',
+        tournamentName: null,
         child: Center(child: CircularProgressIndicator()),
       );
     }
@@ -64,6 +71,7 @@ class _RefereeShellPageState extends ConsumerState<RefereeShellPage> {
     if (role == null || user == null) {
       return const _RefereeScaffold(
         roleLabel: 'Referee',
+        tournamentName: null,
         child: _RefereeEmptyState(
           title: 'Referee access not available',
           message: 'Sign in with an assigned referee or staff account.',
@@ -101,11 +109,12 @@ class _RefereeShellPageState extends ConsumerState<RefereeShellPage> {
 
     return _RefereeScaffold(
       roleLabel: role.role.label,
+      tournamentName: tournamentName,
       child: ListView(
         padding: const EdgeInsets.all(AppSpace.lg),
         children: [
           _RefereeHero(
-            tournamentId: widget.tournamentId,
+            tournamentName: tournamentName,
             activeCount: visibleMatches.length,
             submittedCount: visibleMatches
                 .where((match) => match.isScoreSubmitted)
@@ -233,17 +242,45 @@ class _RefereeShellPageState extends ConsumerState<RefereeShellPage> {
 }
 
 final class _RefereeScaffold extends StatelessWidget {
-  const _RefereeScaffold({required this.child, required this.roleLabel});
+  const _RefereeScaffold({
+    required this.child,
+    required this.roleLabel,
+    required this.tournamentName,
+  });
 
   final Widget child;
   final String roleLabel;
+  final String? tournamentName;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: _RoleDeskBackButton(
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+              return;
+            }
+            context.go('/');
+          },
+        ),
         title: const Text('Referee desk'),
         actions: [
+          if (tournamentName != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Center(
+                child: Text(
+                  tournamentName!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppPalette.inkSoft,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: Chip(
@@ -261,12 +298,12 @@ final class _RefereeScaffold extends StatelessWidget {
 
 final class _RefereeHero extends StatelessWidget {
   const _RefereeHero({
-    required this.tournamentId,
+    required this.tournamentName,
     required this.activeCount,
     required this.submittedCount,
   });
 
-  final String tournamentId;
+  final String tournamentName;
   final int activeCount;
   final int submittedCount;
 
@@ -284,7 +321,7 @@ final class _RefereeHero extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Tournament $tournamentId',
+            tournamentName,
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: AppSpace.xs),
@@ -308,6 +345,21 @@ final class _RefereeHero extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+final class _RoleDeskBackButton extends StatelessWidget {
+  const _RoleDeskBackButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: 'Back',
+      icon: const Icon(Icons.arrow_back_rounded),
+      onPressed: onPressed,
     );
   }
 }

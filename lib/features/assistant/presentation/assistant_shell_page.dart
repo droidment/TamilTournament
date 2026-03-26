@@ -1,6 +1,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../../theme/app_theme.dart';
 import '../../auth/data/auth_providers.dart';
@@ -12,6 +13,7 @@ import '../../scheduler/domain/score_submission.dart';
 import '../../scheduler/domain/tournament_court.dart';
 import '../../scheduler/domain/tournament_match.dart';
 import '../../tournaments/data/tournament_role_providers.dart';
+import '../../tournaments/data/tournament_providers.dart';
 import '../../tournaments/domain/tournament_role.dart';
 
 final class AssistantShellPage extends ConsumerStatefulWidget {
@@ -38,6 +40,9 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
       pendingSubmissionsProvider(widget.tournamentId),
     );
     final roleAsync = ref.watch(currentUserRoleProvider(widget.tournamentId));
+    final tournamentAsync = ref.watch(tournamentByIdProvider(widget.tournamentId));
+    final tournamentName =
+        tournamentAsync.asData?.value?.name ?? widget.tournamentId;
 
     final firstError =
         matchesAsync.error ??
@@ -47,6 +52,7 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
     if (firstError != null) {
       return _AssistantScaffold(
         roleLabel: 'Assistant',
+        tournamentName: tournamentName,
         child: _EmptyState(
           title: 'Unable to load assistant workspace',
           message: firstError.toString(),
@@ -61,6 +67,7 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
         roleAsync.isLoading) {
       return const _AssistantScaffold(
         roleLabel: 'Assistant',
+        tournamentName: null,
         child: Center(child: CircularProgressIndicator()),
       );
     }
@@ -70,6 +77,7 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
     if (role == null || user == null) {
       return const _AssistantScaffold(
         roleLabel: 'Assistant',
+        tournamentName: null,
         child: _EmptyState(
           title: 'Assistant access not available',
           message: 'Sign in with a permitted tournament role to continue.',
@@ -116,11 +124,13 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
 
     return _AssistantScaffold(
       roleLabel: role.role.label,
+      tournamentName: tournamentName,
       child: ListView(
         padding: const EdgeInsets.all(AppSpace.lg),
         children: [
           _buildSummary(
             context,
+            tournamentName,
             readyMatches.length,
             assignedMatches.length,
             onCourtMatches.length,
@@ -143,6 +153,7 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
 
   Widget _buildSummary(
     BuildContext context,
+    String tournamentName,
     int readyCount,
     int assignedCount,
     int onCourtCount,
@@ -153,7 +164,7 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            'Tournament ${widget.tournamentId}',
+            tournamentName,
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: AppSpace.xs),
@@ -556,17 +567,45 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
 }
 
 final class _AssistantScaffold extends StatelessWidget {
-  const _AssistantScaffold({required this.child, required this.roleLabel});
+  const _AssistantScaffold({
+    required this.child,
+    required this.roleLabel,
+    required this.tournamentName,
+  });
 
   final Widget child;
   final String roleLabel;
+  final String? tournamentName;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: _RoleDeskBackButton(
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+              return;
+            }
+            context.go('/');
+          },
+        ),
         title: const Text('Assistant desk'),
         actions: [
+          if (tournamentName != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Center(
+                child: Text(
+                  tournamentName!,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: AppPalette.inkSoft,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
           Padding(
             padding: const EdgeInsets.only(right: 12),
             child: Chip(
@@ -578,6 +617,21 @@ final class _AssistantScaffold extends StatelessWidget {
         ],
       ),
       body: SafeArea(child: child),
+    );
+  }
+}
+
+final class _RoleDeskBackButton extends StatelessWidget {
+  const _RoleDeskBackButton({required this.onPressed});
+
+  final VoidCallback onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    return IconButton(
+      tooltip: 'Back',
+      icon: const Icon(Icons.arrow_back_rounded),
+      onPressed: onPressed,
     );
   }
 }
