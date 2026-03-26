@@ -47,4 +47,4 @@ jobs:
       - name: Deploy to Firebase Hosting
         env:
           FIREBASE_TOKEN: ${{ secrets.FIREBASE_TOKEN }}
-        run: firebase deploy --only hosting,firestore:rules --project tamiltournament-e7c59 --token "$FIREBASE_TOKEN"
+        run: firebase deploy --only hosting,firestore:rules,firestore:indexes --project tamiltournament-e7c59 --token "$FIREBASE_TOKEN"
