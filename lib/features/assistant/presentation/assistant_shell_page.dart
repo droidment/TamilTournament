@@ -27,6 +27,7 @@ final class AssistantShellPage extends ConsumerStatefulWidget {
 
 class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
   String? _busyActionId;
+  int _selectedTabIndex = 0;
 
   @override
   Widget build(BuildContext context) {
@@ -53,6 +54,7 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
       return _AssistantScaffold(
         roleLabel: 'Assistant',
         tournamentName: tournamentName,
+        selectedTabIndex: _selectedTabIndex,
         child: _EmptyState(
           title: 'Unable to load assistant workspace',
           message: firstError.toString(),
@@ -68,6 +70,7 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
       return const _AssistantScaffold(
         roleLabel: 'Assistant',
         tournamentName: null,
+        selectedTabIndex: 0,
         child: Center(child: CircularProgressIndicator()),
       );
     }
@@ -78,6 +81,7 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
       return const _AssistantScaffold(
         roleLabel: 'Assistant',
         tournamentName: null,
+        selectedTabIndex: 0,
         child: _EmptyState(
           title: 'Assistant access not available',
           message: 'Sign in with a permitted tournament role to continue.',
@@ -122,32 +126,138 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
       for (final match in matches) match.id: match,
     };
 
+    final tabBody = switch (_selectedTabIndex) {
+      0 => _buildDeskTab(
+        context,
+        tournamentName,
+        readyMatches,
+        availableCourts,
+        assignedMatches,
+        user,
+        role.role,
+        onCourtMatches,
+        submissions.length,
+      ),
+      1 => _buildApprovalsTab(
+        context,
+        tournamentName,
+        readyMatches.length,
+        assignedMatches.length,
+        onCourtMatches.length,
+        submissions,
+        user,
+        role.role,
+        matchById,
+      ),
+      _ => _buildCourtsTab(
+        context,
+        tournamentName,
+        readyMatches.length,
+        assignedMatches.length,
+        onCourtMatches.length,
+        submissions.length,
+        courts,
+        matchByCourtId,
+      ),
+    };
+
     return _AssistantScaffold(
       roleLabel: role.role.label,
       tournamentName: tournamentName,
-      child: ListView(
-        padding: const EdgeInsets.all(AppSpace.lg),
-        children: [
-          _buildSummary(
-            context,
-            tournamentName,
-            readyMatches.length,
-            assignedMatches.length,
-            onCourtMatches.length,
-            submissions.length,
-          ),
-          const SizedBox(height: AppSpace.lg),
-          _buildCourts(context, courts, matchByCourtId),
-          const SizedBox(height: AppSpace.xl),
-          _buildReadyQueue(context, readyMatches, availableCourts),
-          const SizedBox(height: AppSpace.xl),
-          _buildAssigned(context, assignedMatches),
-          const SizedBox(height: AppSpace.xl),
-          _buildOnCourt(context, user, role.role, onCourtMatches),
-          const SizedBox(height: AppSpace.xl),
-          _buildSubmissions(context, user, role.role, submissions, matchById),
-        ],
-      ),
+      selectedTabIndex: _selectedTabIndex,
+      onSelectTab: (index) {
+        setState(() {
+          _selectedTabIndex = index;
+        });
+      },
+      child: tabBody,
+    );
+  }
+
+  Widget _buildDeskTab(
+    BuildContext context,
+    String tournamentName,
+    List<TournamentMatch> readyMatches,
+    List<TournamentCourt> availableCourts,
+    List<TournamentMatch> assignedMatches,
+    User user,
+    TournamentRoleType role,
+    List<TournamentMatch> onCourtMatches,
+    int pendingCount,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.all(AppSpace.lg),
+      children: [
+        _buildSummary(
+          context,
+          tournamentName,
+          readyMatches.length,
+          assignedMatches.length,
+          onCourtMatches.length,
+          pendingCount,
+        ),
+        const SizedBox(height: AppSpace.lg),
+        _buildReadyQueue(context, readyMatches, availableCourts),
+        const SizedBox(height: AppSpace.xl),
+        _buildAssigned(context, assignedMatches),
+        const SizedBox(height: AppSpace.xl),
+        _buildOnCourt(context, user, role, onCourtMatches),
+      ],
+    );
+  }
+
+  Widget _buildApprovalsTab(
+    BuildContext context,
+    String tournamentName,
+    int readyCount,
+    int assignedCount,
+    int onCourtCount,
+    List<ScoreSubmission> submissions,
+    User user,
+    TournamentRoleType role,
+    Map<String, TournamentMatch> matchById,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.all(AppSpace.lg),
+      children: [
+        _buildSummary(
+          context,
+          tournamentName,
+          readyCount,
+          assignedCount,
+          onCourtCount,
+          submissions.length,
+        ),
+        const SizedBox(height: AppSpace.lg),
+        _buildSubmissions(context, user, role, submissions, matchById),
+      ],
+    );
+  }
+
+  Widget _buildCourtsTab(
+    BuildContext context,
+    String tournamentName,
+    int readyCount,
+    int assignedCount,
+    int onCourtCount,
+    int pendingCount,
+    List<TournamentCourt> courts,
+    Map<String, TournamentMatch> matchByCourtId,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.all(AppSpace.lg),
+      children: [
+        _buildSummary(
+          context,
+          tournamentName,
+          readyCount,
+          assignedCount,
+          onCourtCount,
+          pendingCount,
+        ),
+        const SizedBox(height: AppSpace.lg),
+        _buildCourts(context, courts, matchByCourtId),
+      ],
     );
   }
 
@@ -571,11 +681,15 @@ final class _AssistantScaffold extends StatelessWidget {
     required this.child,
     required this.roleLabel,
     required this.tournamentName,
+    required this.selectedTabIndex,
+    this.onSelectTab,
   });
 
   final Widget child;
   final String roleLabel;
   final String? tournamentName;
+  final int selectedTabIndex;
+  final ValueChanged<int>? onSelectTab;
 
   @override
   Widget build(BuildContext context) {
@@ -617,6 +731,27 @@ final class _AssistantScaffold extends StatelessWidget {
         ],
       ),
       body: SafeArea(child: child),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: selectedTabIndex,
+        onDestinationSelected: onSelectTab,
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.view_list_rounded),
+            selectedIcon: Icon(Icons.view_list),
+            label: 'Desk',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.fact_check_outlined),
+            selectedIcon: Icon(Icons.fact_check),
+            label: 'Approvals',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.grid_view_outlined),
+            selectedIcon: Icon(Icons.grid_view_rounded),
+            label: 'Courts',
+          ),
+        ],
+      ),
     );
   }
 }
