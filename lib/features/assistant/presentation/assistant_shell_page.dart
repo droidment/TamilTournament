@@ -145,6 +145,13 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
     final matchById = <String, TournamentMatch>{
       for (final match in matches) match.id: match,
     };
+    final inPlayCourtIds = onCourtMatches
+        .where((match) => match.assignedCourtId != null)
+        .map((match) => match.assignedCourtId!)
+        .toSet();
+    final inPlayCourts = courts
+        .where((court) => inPlayCourtIds.contains(court.id))
+        .toList(growable: false);
 
     final tabBody = switch (_selectedTabIndex) {
       0 => _buildDeskTab(
@@ -158,7 +165,17 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
         onCourtMatches,
         submissions.length,
       ),
-      1 => _buildApprovalsTab(
+      1 => _buildInPlayCourtsTab(
+        context,
+        tournamentName,
+        readyMatches.length,
+        assignedMatches.length,
+        onCourtMatches.length,
+        submissions.length,
+        inPlayCourts,
+        matchByCourtId,
+      ),
+      2 => _buildApprovalsTab(
         context,
         tournamentName,
         readyMatches.length,
@@ -227,6 +244,42 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
     );
   }
 
+  Widget _buildInPlayCourtsTab(
+    BuildContext context,
+    String tournamentName,
+    int readyCount,
+    int assignedCount,
+    int onCourtCount,
+    int pendingCount,
+    List<TournamentCourt> courts,
+    Map<String, TournamentMatch> matchByCourtId,
+  ) {
+    return ListView(
+      padding: const EdgeInsets.all(AppSpace.lg),
+      children: [
+        _buildSummary(
+          context,
+          tournamentName,
+          readyCount,
+          assignedCount,
+          onCourtCount,
+          pendingCount,
+        ),
+        const SizedBox(height: AppSpace.lg),
+        _buildCourts(
+          context,
+          courts,
+          matchByCourtId,
+          title: 'Courts in play',
+          subtitle:
+              'Focus on active courts that currently need live floor attention.',
+          emptyTitle: 'No courts in play',
+          emptyMessage: 'Active courts will appear here once matches start.',
+        ),
+      ],
+    );
+  }
+
   Widget _buildApprovalsTab(
     BuildContext context,
     String tournamentName,
@@ -280,7 +333,17 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
           pendingCount,
         ),
         const SizedBox(height: AppSpace.lg),
-        _buildCourts(context, courts, matchByCourtId),
+        _buildCourts(
+          context,
+          courts,
+          matchByCourtId,
+          title: 'Court board',
+          subtitle:
+              'Track which courts are open and what is currently on them.',
+          emptyTitle: 'No courts configured',
+          emptyMessage:
+              'Organizer court setup needs to happen before assistant queueing begins.',
+        ),
       ],
     );
   }
@@ -324,65 +387,56 @@ class _AssistantShellPageState extends ConsumerState<AssistantShellPage> {
   Widget _buildCourts(
     BuildContext context,
     List<TournamentCourt> courts,
-    Map<String, TournamentMatch> matchByCourtId,
-  ) {
+    Map<String, TournamentMatch> matchByCourtId, {
+    required String title,
+    required String subtitle,
+    required String emptyTitle,
+    required String emptyMessage,
+  }) {
     if (courts.isEmpty) {
-      return const _EmptyState(
-        title: 'No courts configured',
-        message:
-            'Organizer court setup needs to happen before assistant queueing begins.',
+      return _EmptyState(
+        title: emptyTitle,
+        message: emptyMessage,
         icon: Icons.grid_view_outlined,
       );
     }
 
+    final orderedCourts = [...courts]
+      ..sort((left, right) {
+        final leftMatch = matchByCourtId[left.id];
+        final rightMatch = matchByCourtId[right.id];
+        final byPriority = _assistantCourtPriority(
+          rightMatch,
+        ).compareTo(_assistantCourtPriority(leftMatch));
+        if (byPriority != 0) {
+          return byPriority;
+        }
+        return left.code.compareTo(right.code);
+      });
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _SectionTitle(
-          title: 'Court board',
-          subtitle:
-              'Track which courts are open and what is currently on them.',
-        ),
+        _SectionTitle(title: title, subtitle: subtitle),
         const SizedBox(height: AppSpace.sm),
-        Wrap(
-          spacing: AppSpace.sm,
-          runSpacing: AppSpace.sm,
-          children: courts.map((court) {
-            final assignedMatch = matchByCourtId[court.id];
-            final label = assignedMatch == null
-                ? (court.isAvailable ? 'Open' : 'Unavailable')
-                : assignedMatch.status.label;
-            return Container(
-              width: 220,
-              padding: const EdgeInsets.all(AppSpace.md),
-              decoration: BoxDecoration(
-                color: AppPalette.surface,
-                borderRadius: BorderRadius.circular(AppRadii.panel),
-                border: Border.all(color: AppPalette.line),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    court.code,
-                    style: Theme.of(context).textTheme.titleMedium,
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final cardWidth = _assistantCourtCardWidth(constraints.maxWidth);
+            return Wrap(
+              spacing: AppSpace.sm,
+              runSpacing: AppSpace.sm,
+              children: orderedCourts.map((court) {
+                final assignedMatch = matchByCourtId[court.id];
+                return SizedBox(
+                  width: cardWidth,
+                  child: _AssistantCourtCard(
+                    court: court,
+                    assignedMatch: assignedMatch,
                   ),
-                  const SizedBox(height: AppSpace.xs),
-                  _StatusBadge(
-                    label: label,
-                    color: _statusColor(assignedMatch?.status),
-                  ),
-                  const SizedBox(height: AppSpace.sm),
-                  Text(
-                    assignedMatch == null
-                        ? 'No match assigned'
-                        : '${assignedMatch.teamOneLabel} vs ${assignedMatch.teamTwoLabel}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ),
+                );
+              }).toList(),
             );
-          }).toList(),
+          },
         ),
       ],
     );
@@ -808,6 +862,11 @@ final class _AssistantScaffold extends StatelessWidget {
             label: 'Desk',
           ),
           NavigationDestination(
+            icon: Icon(Icons.play_circle_outline_rounded),
+            selectedIcon: Icon(Icons.play_circle_fill_rounded),
+            label: 'In play',
+          ),
+          NavigationDestination(
             icon: Icon(Icons.fact_check_outlined),
             selectedIcon: Icon(Icons.fact_check),
             label: 'Approvals',
@@ -816,6 +875,55 @@ final class _AssistantScaffold extends StatelessWidget {
             icon: Icon(Icons.grid_view_outlined),
             selectedIcon: Icon(Icons.grid_view_rounded),
             label: 'Courts',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+final class _AssistantCourtCard extends StatelessWidget {
+  const _AssistantCourtCard({required this.court, required this.assignedMatch});
+
+  final TournamentCourt court;
+  final TournamentMatch? assignedMatch;
+
+  @override
+  Widget build(BuildContext context) {
+    final label = assignedMatch == null
+        ? (court.isAvailable ? 'Open' : 'Unavailable')
+        : assignedMatch!.status.label;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(AppSpace.md),
+      decoration: BoxDecoration(
+        color: AppPalette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        border: Border.all(color: AppPalette.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(court.code, style: Theme.of(context).textTheme.titleMedium),
+          const SizedBox(height: AppSpace.xs),
+          _StatusBadge(
+            label: label,
+            color: _statusColor(assignedMatch?.status),
+          ),
+          const SizedBox(height: AppSpace.xs),
+          Text(
+            court.name,
+            style: Theme.of(
+              context,
+            ).textTheme.bodySmall?.copyWith(color: AppPalette.inkSoft),
+          ),
+          const SizedBox(height: AppSpace.sm),
+          Text(
+            assignedMatch == null
+                ? 'No match assigned'
+                : '${assignedMatch!.teamOneLabel} vs ${assignedMatch!.teamTwoLabel}',
+            style: Theme.of(context).textTheme.bodyMedium,
           ),
         ],
       ),
@@ -932,6 +1040,29 @@ final class _MatchSummary extends StatelessWidget {
       ],
     );
   }
+}
+
+double _assistantCourtCardWidth(double maxWidth) {
+  if (maxWidth < 720) {
+    return maxWidth;
+  }
+  if (maxWidth < 1100) {
+    return (maxWidth - AppSpace.sm) / 2;
+  }
+  return (maxWidth - (AppSpace.sm * 2)) / 3;
+}
+
+int _assistantCourtPriority(TournamentMatch? match) {
+  if (match == null) {
+    return 0;
+  }
+  return switch (match.status) {
+    TournamentMatchStatus.onCourt => 4,
+    TournamentMatchStatus.scoreSubmitted => 3,
+    TournamentMatchStatus.called => 2,
+    TournamentMatchStatus.assigned => 1,
+    _ => 0,
+  };
 }
 
 final class _ActionMatchCard extends StatelessWidget {

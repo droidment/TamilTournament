@@ -377,6 +377,19 @@ final class _RefereeCourtBoard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final orderedCourts = [...courts]
+      ..sort((left, right) {
+        final leftMatch = matchByCourtId[left.id];
+        final rightMatch = matchByCourtId[right.id];
+        final byPriority = _refereeCourtPriority(
+          rightMatch,
+        ).compareTo(_refereeCourtPriority(leftMatch));
+        if (byPriority != 0) {
+          return byPriority;
+        }
+        return left.code.compareTo(right.code);
+      });
+
     if (courts.isEmpty) {
       return const _RefereeEmptyState(
         title: 'Court lookup not ready',
@@ -400,48 +413,162 @@ final class _RefereeCourtBoard extends StatelessWidget {
           ).textTheme.bodyMedium?.copyWith(color: AppPalette.inkSoft),
         ),
         const SizedBox(height: AppSpace.md),
-        Wrap(
-          spacing: AppSpace.sm,
-          runSpacing: AppSpace.sm,
-          children: courts.map((court) {
-            final match = matchByCourtId[court.id];
-            return Container(
-              width: 220,
-              padding: const EdgeInsets.all(AppSpace.md),
-              decoration: BoxDecoration(
-                color: AppPalette.surface,
-                borderRadius: BorderRadius.circular(AppRadii.panel),
-                border: Border.all(color: AppPalette.line),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    court.code,
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: AppSpace.xs),
-                  _RefereeStatusBadge(
-                    label: match?.status.label ?? court.status.label,
-                    color: match == null
-                        ? (court.isAvailable ? Colors.teal : Colors.orange)
-                        : _statusColor(match.status),
-                  ),
-                  const SizedBox(height: AppSpace.sm),
-                  Text(
-                    match == null
-                        ? (court.isAvailable
-                              ? 'Open court'
-                              : 'Court unavailable')
-                        : '${match.teamOneLabel} vs ${match.teamTwoLabel}',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
-              ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final cardWidth = _refereeCourtCardWidth(constraints.maxWidth);
+            return Wrap(
+              spacing: AppSpace.sm,
+              runSpacing: AppSpace.sm,
+              children: orderedCourts.map((court) {
+                final match = matchByCourtId[court.id];
+                return SizedBox(
+                  width: cardWidth,
+                  child: _RefereeCourtCard(court: court, match: match),
+                );
+              }).toList(),
             );
-          }).toList(),
+          },
         ),
       ],
+    );
+  }
+}
+
+final class _RefereeCourtCard extends StatelessWidget {
+  const _RefereeCourtCard({required this.court, required this.match});
+
+  final TournamentCourt court;
+  final TournamentMatch? match;
+
+  @override
+  Widget build(BuildContext context) {
+    final statusColor = match == null
+        ? (court.isAvailable ? Colors.teal : Colors.orange)
+        : _statusColor(match!.status);
+    final teamOneColor = match == null
+        ? AppPalette.sky
+        : _teamAccentColor(
+            categoryName: match!.categoryName,
+            label: match!.teamOneLabel,
+            lane: 0,
+          );
+    final teamTwoColor = match == null
+        ? AppPalette.apricot
+        : _teamAccentColor(
+            categoryName: match!.categoryName,
+            label: match!.teamTwoLabel,
+            lane: 1,
+          );
+
+    return Container(
+      padding: const EdgeInsets.all(AppSpace.md),
+      decoration: BoxDecoration(
+        color: AppPalette.surface,
+        borderRadius: BorderRadius.circular(AppRadii.panel),
+        border: Border.all(color: AppPalette.line),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      court.code,
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: AppSpace.xs),
+                    Text(
+                      court.name,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppPalette.inkSoft,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: AppSpace.sm),
+              _RefereeStatusBadge(
+                label: match?.status.label ?? court.status.label,
+                color: statusColor,
+              ),
+            ],
+          ),
+          const SizedBox(height: AppSpace.md),
+          if (match == null) ...[
+            Text(
+              court.isAvailable ? 'Open court' : 'Court unavailable',
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ] else ...[
+            Text(
+              match!.categoryName,
+              style: Theme.of(
+                context,
+              ).textTheme.labelLarge?.copyWith(color: AppPalette.inkSoft),
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: AppSpace.sm),
+            _RefereeTeamBand(label: match!.teamOneLabel, color: teamOneColor),
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: AppSpace.xs),
+              child: Text(
+                'vs',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: AppPalette.inkMuted,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            _RefereeTeamBand(label: match!.teamTwoLabel, color: teamTwoColor),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+final class _RefereeTeamBand extends StatelessWidget {
+  const _RefereeTeamBand({required this.label, required this.color});
+
+  final String label;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(AppRadii.control),
+        border: Border.all(color: color.withValues(alpha: 0.24)),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 8,
+            height: 8,
+            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          ),
+          const SizedBox(width: AppSpace.sm),
+          Expanded(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: AppPalette.ink,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
@@ -622,6 +749,68 @@ final class _RefereeStatusBadge extends StatelessWidget {
       ),
     );
   }
+}
+
+double _refereeCourtCardWidth(double maxWidth) {
+  if (maxWidth < 720) {
+    return maxWidth;
+  }
+  if (maxWidth < 1100) {
+    return (maxWidth - AppSpace.sm) / 2;
+  }
+  return (maxWidth - (AppSpace.sm * 2)) / 3;
+}
+
+int _refereeCourtPriority(TournamentMatch? match) {
+  if (match == null) {
+    return 0;
+  }
+  return switch (match.status) {
+    TournamentMatchStatus.onCourt => 4,
+    TournamentMatchStatus.called => 3,
+    TournamentMatchStatus.assigned => 2,
+    TournamentMatchStatus.scoreSubmitted => 1,
+    _ => 0,
+  };
+}
+
+Color _teamAccentColor({
+  required String categoryName,
+  required String label,
+  required int lane,
+}) {
+  final baseColor = _categoryAccentColor(categoryName);
+  final palette = <Color>[
+    baseColor,
+    Color.lerp(baseColor, AppPalette.sky, 0.32) ?? AppPalette.sky,
+    Color.lerp(baseColor, AppPalette.apricot, 0.42) ?? AppPalette.apricot,
+    Color.lerp(baseColor, AppPalette.blossom, 0.42) ?? AppPalette.blossom,
+    Color.lerp(baseColor, AppPalette.oliveStrong, 0.24) ??
+        AppPalette.oliveStrong,
+  ];
+  final normalizedLabel = label.trim().toLowerCase();
+  final seed = normalizedLabel.codeUnits.fold<int>(
+    lane,
+    (sum, codeUnit) => sum + codeUnit,
+  );
+  return palette[seed % palette.length];
+}
+
+Color _categoryAccentColor(String categoryName) {
+  final normalized = categoryName.toLowerCase();
+  if (normalized.contains('women')) {
+    return AppPalette.womenCategory;
+  }
+  if (normalized.contains('50') || normalized.contains('fifty')) {
+    return AppPalette.fiftyCategory;
+  }
+  if (normalized.contains('40') || normalized.contains('forty')) {
+    return AppPalette.fortyCategory;
+  }
+  if (normalized.contains('men')) {
+    return AppPalette.menCategory;
+  }
+  return AppPalette.sky;
 }
 
 final class _RefereeEmptyState extends StatelessWidget {
